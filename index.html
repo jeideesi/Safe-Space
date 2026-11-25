@@ -803,83 +803,6 @@
       color: var(--accent);
     }
 
-
-    /* JSON FEED & BACKUP PANEL */
-    .json-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0.9rem 1.1rem;
-      margin-bottom: 1rem;
-    }
-
-    .json-panel-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.6rem;
-    }
-
-    .json-panel-title {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--accent);
-    }
-
-    .json-panel-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-    }
-
-    .json-drawer {
-      margin-top: 0.85rem;
-      padding-top: 0.85rem;
-      border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-    }
-
-    .json-drawer-row {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .json-drawer-row input[type="url"] {
-      flex: 1;
-      min-width: 220px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.55rem 0.75rem;
-      border-radius: 8px;
-      font-size: 0.85rem;
-    }
-
-    .json-drawer-row input[type="url"]:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .json-textarea {
-      width: 100%;
-      min-height: 130px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 0.8rem;
-      line-height: 1.45;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.7rem;
-      margin-top: 0;
-      resize: vertical;
-    }
-
     /* RESPONSIVE ADJUSTMENTS */
     @media (max-width: 540px) {
       header {
@@ -1002,29 +925,6 @@
         </select>
 
         <button id="restore-posts-btn" type="button" class="secondary-btn">Restore Posts</button>
-      </div>
-
-            <div class="json-panel" aria-label="JSON Feed Sync and Backup">
-        <div class="json-panel-top">
-          <span class="json-panel-title">JSON Feed &amp; Data</span>
-          <div class="json-panel-actions">
-            <button id="toggle-json-drawer-btn" type="button" class="secondary-btn">JSON Endpoint &amp; Raw</button>
-            <button id="export-json-btn" type="button" class="secondary-btn">Download JSON</button>
-          </div>
-        </div>
-        <div id="json-drawer" class="json-drawer hidden">
-          <div class="json-drawer-row">
-            <input id="custom-json-url-input" type="url" placeholder="https://your-json-endpoint-url-here" aria-label="Custom JSON Endpoint URL" />
-            <button id="save-json-url-btn" type="button" class="primary-btn">Use JSON URL</button>
-            <button id="sync-json-now-btn" type="button" class="secondary-btn">Sync Now</button>
-          </div>
-          <textarea id="json-raw-editor" class="json-textarea" placeholder='[{"id":"...","alias":"...","content":"..."}]'></textarea>
-          <div class="json-drawer-row">
-            <button id="load-json-editor-btn" type="button" class="secondary-btn">Load Current Posts as JSON</button>
-            <button id="import-json-editor-btn" type="button" class="primary-btn">Import JSON to Wall</button>
-            <button id="copy-json-btn" type="button" class="secondary-btn">Copy JSON</button>
-          </div>
-        </div>
       </div>
 
       <div id="posts-feed" class="feed"></div>
@@ -2553,377 +2453,109 @@
 
       persistAllPostsToArchive();
 
-      // --- RESILIENT CROSS-DEVICE JSON SYNC (AUTO-PROVISIONING + #feed= / ?feed= SUPPORT) ---
-      const SHARED_JSON_BIN_URL = 'https://jsonblob.com/api/jsonBlob/PASTE_YOUR_SHARED_ID_HERE';
-      const SHARED_CROSS_DEVICE_URL = SHARED_JSON_BIN_URL;
-      const STORAGE_SHARED_ENDPOINT_KEY = 'safespace_shared_json_endpoint_v1';
+      // --- XAMPP PHP + MYSQL SYNC (api.php) ---
+      const XAMPP_API_URL = 'api.php';
+      let isSyncingXampp = false;
 
-      const JSON_PROVIDERS = [
-        {
-          name: 'jsonblob',
-          createUrl: 'https://jsonblob.com/api/jsonBlob',
-          buildReadUrl: (id) => `https://jsonblob.com/api/jsonBlob/${id}`,
-          buildWriteUrl: (id) => `https://jsonblob.com/api/jsonBlob/${id}`,
-          extractId: (res, data) => {
-            const loc = res.headers.get('location') || res.headers.get('x-jsonblob-id') || '';
-            const m = loc.match(/([A-Za-z0-9_-]{8,})\s*$/);
-            if (m) return m[1];
-            if (data && typeof data.id === 'string') return data.id;
-            return null;
-          }
-        },
-        {
-          name: 'superjsonblob',
-          createUrl: 'https://superjsonblob.com/api/jsonBlob',
-          buildReadUrl: (id) => `https://superjsonblob.com/api/jsonBlob/${id}`,
-          buildWriteUrl: (id) => `https://superjsonblob.com/api/jsonBlob/${id}`,
-          extractId: (res, data) => {
-            if (data && typeof data.id === 'string') return data.id;
-            const loc = res.headers.get('location') || '';
-            const m = loc.match(/([A-Za-z0-9_-]{8,})\s*$/);
-            return m ? m[1] : null;
-          }
-        }
-      ];
-
-      let isSyncingCrossDevice = false;
-      let activeFeedId = '';
-      let activeFeedUrl = '';
-
-      function hasValidSharedUrl(url) {
-        return (
-          typeof url === 'string' &&
-          url.startsWith('https://') &&
-          !url.includes('PASTE_YOUR_SHARED_ID_HERE')
-        );
-      }
-
-      function parseFeedParamFromLocation() {
+      async function fetchXamppPosts() {
+        if (isSyncingXampp) return;
+        isSyncingXampp = true;
         try {
-          const hash = window.location.hash || '';
-          const hashMatch = hash.match(/feed=([^&]+)/);
-          if (hashMatch && hashMatch[1]) {
-            return decodeURIComponent(hashMatch[1]).trim();
-          }
-          const params = new URLSearchParams(window.location.search || '');
-          const qFeed = params.get('feed');
-          if (qFeed) return qFeed.trim();
-        } catch (_) {}
-        return '';
-      }
-
-      function resolveActiveFeedConfig() {
-        const paramVal = parseFeedParamFromLocation();
-        if (paramVal) {
-          if (paramVal.startsWith('https://')) {
-            return { id: '', url: paramVal };
-          }
-          if (/^[A-Za-z0-9_-]{8,}$/.test(paramVal)) {
-            return { id: paramVal, url: `https://jsonblob.com/api/jsonBlob/${paramVal}` };
-          }
-        }
-
-        if (hasValidSharedUrl(SHARED_CROSS_DEVICE_URL)) {
-          const m = SHARED_CROSS_DEVICE_URL.match(/([A-Za-z0-9_-]{8,})(?:\?.*)?$/);
-          return { id: m ? m[1] : '', url: SHARED_CROSS_DEVICE_URL };
-        }
-
-        try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_SHARED_ENDPOINT_KEY) || 'null');
-          if (saved && hasValidSharedUrl(saved.url)) {
-            return { id: saved.id || '', url: saved.url };
-          }
-        } catch (_) {}
-
-        return { id: '', url: '' };
-      }
-
-      function writeFeedHashToUrl(feedToken) {
-        if (!feedToken) return;
-        try {
-          const encoded = encodeURIComponent(feedToken);
-          const expectedFragment = `#feed=${encoded}`;
-          if ((window.location.hash || '') !== expectedFragment) {
-            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${expectedFragment}`);
-          }
-        } catch (_) {}
-      }
-
-      function extractSharedPosts(payload) {
-        if (Array.isArray(payload)) return payload;
-        if (payload && Array.isArray(payload.posts)) return payload.posts;
-        if (payload && Array.isArray(payload.record)) return payload.record;
-        if (payload && typeof payload === 'object') {
-          const values = Object.values(payload).filter(v => v && typeof v === 'object' && v.id && v.content);
-          if (values.length > 0) return values;
-        }
-        return [];
-      }
-
-      function getCurrentPostsSnapshot() {
-        return Object.values(postsMap)
-          .filter(p => p && p.id && p.content)
-          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-          .slice(0, 100);
-      }
-
-      async function provisionSharedFeed(initialPosts) {
-        const payload = Array.isArray(initialPosts) && initialPosts.length > 0
-          ? initialPosts
-          : starterPosts.map(clonePost);
-
-        for (const provider of JSON_PROVIDERS) {
-          try {
-            const res = await fetch(provider.createUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify(payload),
-              cache: 'no-store'
-            });
-            if (!res.ok) continue;
-
-            let data = null;
-            try {
-              data = await res.json();
-            } catch (_) {}
-
-            const blobId = provider.extractId(res, data);
-            const writeUrl = blobId ? provider.buildWriteUrl(blobId) : (res.headers.get('location') || '');
-            if (writeUrl && writeUrl.startsWith('https://')) {
-              const token = blobId || writeUrl;
-              activeFeedId = blobId || '';
-              activeFeedUrl = writeUrl;
-              try {
-                localStorage.setItem(STORAGE_SHARED_ENDPOINT_KEY, JSON.stringify({ id: activeFeedId, url: activeFeedUrl }));
-              } catch (_) {}
-              writeFeedHashToUrl(token);
-              return { id: activeFeedId, url: activeFeedUrl };
-            }
-          } catch (_) {}
-        }
-        return null;
-      }
-
-      async function pullSharedPosts() {
-        if (isSyncingCrossDevice) return;
-        let cfg = resolveActiveFeedConfig();
-        if (!cfg.url) {
-          cfg = await provisionSharedFeed(getCurrentPostsSnapshot());
-          if (!cfg || !cfg.url) return;
-        }
-
-        activeFeedId = cfg.id || activeFeedId;
-        activeFeedUrl = cfg.url;
-        writeFeedHashToUrl(cfg.id || cfg.url);
-
-        isSyncingCrossDevice = true;
-        try {
-          const sep = cfg.url.includes('?') ? '&' : '?';
-          const res = await fetch(`${cfg.url}${sep}_t=${Date.now()}`, {
+          const res = await fetch(`${XAMPP_API_URL}?_t=${Date.now()}`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             cache: 'no-store'
           });
           if (!res.ok) return;
           const data = await res.json();
-          const remotePosts = extractSharedPosts(data);
-          if (remotePosts.length > 0) {
-            hydratePosts(remotePosts);
-            persistAllPostsToArchive();
-          }
-        } catch (_) {
-          // Keep local/offline feed working seamlessly without interrupting user
-        } finally {
-          isSyncingCrossDevice = false;
-        }
-      }
-
-      async function pushSharedPosts() {
-        if (isSyncingCrossDevice) return;
-        let cfg = resolveActiveFeedConfig();
-        if (!cfg.url) {
-          cfg = await provisionSharedFeed(getCurrentPostsSnapshot());
-          if (!cfg || !cfg.url) {
-            showToast('Saved locally; shared JSON endpoint is temporarily unreachable.');
-            return;
-          }
-        }
-
-        activeFeedId = cfg.id || activeFeedId;
-        activeFeedUrl = cfg.url;
-        writeFeedHashToUrl(cfg.id || cfg.url);
-
-        isSyncingCrossDevice = true;
-        try {
-          const sep = cfg.url.includes('?') ? '&' : '?';
-          const getRes = await fetch(`${cfg.url}${sep}_t=${Date.now()}`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            cache: 'no-store'
-          });
-          if (getRes.ok) {
-            const latestRemote = extractSharedPosts(await getRes.json());
-            if (latestRemote.length > 0) {
-              hydratePosts(latestRemote);
-            }
-          }
-
-          const mergedPosts = getCurrentPostsSnapshot();
-          const putRes = await fetch(cfg.url, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify(mergedPosts)
-          });
-
-          if (putRes.ok) {
-            persistAllPostsToArchive();
-          } else {
-            // If existing blob rejected PUT, provision a fresh shared JSON blob once
-            const freshCfg = await provisionSharedFeed(mergedPosts);
-            if (freshCfg && freshCfg.url) {
-              await fetch(freshCfg.url, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json'
-                },
-                body: JSON.stringify(mergedPosts)
-              });
+          if (data && data.ok && Array.isArray(data.posts)) {
+            if (data.posts.length > 0) {
+              hydratePosts(data.posts);
               persistAllPostsToArchive();
             }
+            if (!socket || !socket.connected) {
+              setPresenceUI({ online: true, statusText: 'XAMPP MySQL Sync' });
+            }
           }
         } catch (_) {
-          showToast('Saved locally; could not reach shared JSON sync right now.');
+          // Silently fall back to localStorage when opened outside XAMPP
         } finally {
-          isSyncingCrossDevice = false;
+          isSyncingXampp = false;
         }
       }
 
-      document.getElementById('submit-post').addEventListener('click', () => {
-        setTimeout(pushSharedPosts, 250);
-      });
-
-      postsFeed.addEventListener('submit', () => {
-        setTimeout(pushSharedPosts, 250);
-      });
-
-      window.addEventListener('hashchange', () => {
-        pullSharedPosts();
-      });
-
-
-      // --- INTERACTIVE JSON ENDPOINT CONFIG + RAW JSON IMPORT/EXPORT ---
-      const toggleJsonDrawerBtn = document.getElementById('toggle-json-drawer-btn');
-      const jsonDrawer = document.getElementById('json-drawer');
-      const customJsonUrlInput = document.getElementById('custom-json-url-input');
-      const saveJsonUrlBtn = document.getElementById('save-json-url-btn');
-      const syncJsonNowBtn = document.getElementById('sync-json-now-btn');
-      const jsonRawEditor = document.getElementById('json-raw-editor');
-      const loadJsonEditorBtn = document.getElementById('load-json-editor-btn');
-      const importJsonEditorBtn = document.getElementById('import-json-editor-btn');
-      const copyJsonBtn = document.getElementById('copy-json-btn');
-      const exportJsonBtn = document.getElementById('export-json-btn');
-
-      function refreshJsonUrlInput() {
-        const cfg = resolveActiveFeedConfig();
-        customJsonUrlInput.value = cfg.url || '';
-      }
-
-      function refreshJsonEditor() {
-        jsonRawEditor.value = JSON.stringify(getCurrentPostsSnapshot(), null, 2);
-      }
-
-      toggleJsonDrawerBtn.addEventListener('click', () => {
-        jsonDrawer.classList.toggle('hidden');
-        if (!jsonDrawer.classList.contains('hidden')) {
-          refreshJsonUrlInput();
-          refreshJsonEditor();
-        }
-      });
-
-      saveJsonUrlBtn.addEventListener('click', async () => {
-        const rawUrl = customJsonUrlInput.value.trim();
-        if (!rawUrl || !rawUrl.startsWith('https://')) {
-          showToast('Please enter a valid https:// JSON endpoint URL.');
-          return;
-        }
-        activeFeedUrl = rawUrl;
-        const idMatch = rawUrl.match(/([A-Za-z0-9_-]{8,})(?:\?.*)?$/);
-        activeFeedId = idMatch ? idMatch[1] : '';
+      async function savePostToXampp(post) {
         try {
-          localStorage.setItem(STORAGE_SHARED_ENDPOINT_KEY, JSON.stringify({ id: activeFeedId, url: activeFeedUrl }));
-        } catch (_) {}
-        writeFeedHashToUrl(activeFeedId || activeFeedUrl);
-        showToast('Saved custom JSON endpoint URL.');
-        await pullSharedPosts();
-        await pushSharedPosts();
-        refreshJsonEditor();
-      });
-
-      syncJsonNowBtn.addEventListener('click', async () => {
-        await pullSharedPosts();
-        await pushSharedPosts();
-        refreshJsonEditor();
-        showToast('Synced posts with JSON feed.');
-      });
-
-      loadJsonEditorBtn.addEventListener('click', () => {
-        refreshJsonEditor();
-        showToast('Loaded current posts as JSON.');
-      });
-
-      importJsonEditorBtn.addEventListener('click', async () => {
-        try {
-          const parsed = JSON.parse(jsonRawEditor.value);
-          const importedPosts = extractSharedPosts(parsed);
-          if (importedPosts.length === 0) {
-            showToast('No valid post objects found in JSON.');
-            return;
+          const res = await fetch(XAMPP_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              action: 'create_post',
+              id: post.id,
+              alias: post.alias,
+              mood: post.mood,
+              interest: post.interest,
+              content: post.content,
+              allowComments: post.allowComments,
+              createdAt: post.createdAt
+            })
+          });
+          if (res.ok) {
+            setPresenceUI({ online: true, statusText: 'XAMPP MySQL Sync' });
           }
-          hydratePosts(importedPosts);
-          persistAllPostsToArchive();
-          await pushSharedPosts();
-          showToast(`Imported ${importedPosts.length} post(s) from JSON.`);
-        } catch (_) {
-          showToast('Invalid JSON format. Please check your syntax.');
-        }
-      });
+        } catch (_) {}
+      }
 
-      copyJsonBtn.addEventListener('click', async () => {
-        const text = jsonRawEditor.value || JSON.stringify(getCurrentPostsSnapshot(), null, 2);
+      async function saveCommentToXampp(postId, comment) {
         try {
-          await navigator.clipboard.writeText(text);
-          showToast('JSON copied to clipboard.');
-        } catch (_) {
-          jsonRawEditor.select();
-          document.execCommand('copy');
-          showToast('JSON copied.');
-        }
+          const res = await fetch(XAMPP_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              action: 'add_comment',
+              id: comment.id,
+              postId,
+              alias: comment.alias,
+              text: comment.text,
+              createdAt: comment.createdAt
+            })
+          });
+          if (res.ok) {
+            setPresenceUI({ online: true, statusText: 'XAMPP MySQL Sync' });
+          }
+        } catch (_) {}
+      }
+
+      // Hook post creation into XAMPP MySQL
+      document.getElementById('submit-post').addEventListener('click', () => {
+        setTimeout(() => {
+          const latest = Object.values(postsMap)
+            .filter(p => p && p.id && !String(p.id).startsWith('seed-'))
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+          if (latest) {
+            savePostToXampp(latest);
+          }
+        }, 20);
       });
 
-      exportJsonBtn.addEventListener('click', () => {
-        const payload = JSON.stringify(getCurrentPostsSnapshot(), null, 2);
-        const blob = new Blob([payload], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `safespace-posts-${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('Downloaded posts as JSON file.');
+      // Hook comment creation into XAMPP MySQL
+      postsFeed.addEventListener('submit', (e) => {
+        const form = e.target.closest('.comment-form');
+        if (!form) return;
+        const postId = form.dataset.id;
+        setTimeout(() => {
+          const post = postsMap[postId];
+          if (post && Array.isArray(post.comments) && post.comments.length > 0) {
+            const latestComment = post.comments[post.comments.length - 1];
+            saveCommentToXampp(postId, latestComment);
+          }
+        }, 20);
       });
 
-      pullSharedPosts();
-      setInterval(pullSharedPosts, 5000);
-    });
+      fetchXamppPosts();
+      setInterval(fetchXamppPosts, 4000);
+
+      });
   </script>
 </body>
 </html>
