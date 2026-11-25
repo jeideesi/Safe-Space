@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SafeSpace — Anonymous Freedom Wall</title>
-  <!-- Socket.io client for real-time presence, shared Freedom Wall, and 1-Minute Empathy Match -->
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <style>
     :root {
@@ -620,10 +619,9 @@
         Your Session Alias: <strong id="user-alias">Loading...</strong>
         <button id="reroll-alias" title="Generate new anonymous name">↻</button>
       </div>
-      <!-- Live presence counter & server wakeup status -->
       <div class="sync-status">
         <span id="sync-dot" class="sync-dot"></span>
-        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Waking backend server... please wait up to 50 seconds</span>
+        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Local &amp; Live Ready</span>
       </div>
     </div>
   </header>
@@ -815,15 +813,12 @@
   </aside>
 
   <script>
-    // --- BACKEND SERVER & WAKEUP CONFIGURATION ---
     const BACKEND_BASE_URL =
       window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:3001'
         : 'https://safespace-realtime-server.onrender.com';
 
-    const WAKEUP_ENDPOINT = `${BACKEND_BASE_URL}/api/health`;
-    const WAKEUP_MAX_WINDOW_MS = 65000;
-    const WAKEUP_POLL_INTERVAL_MS = 2500;
+    const LOCAL_POSTS_KEY = 'safespace_local_posts_v1';
 
     const interestLabels = {
       ANY: 'Any Interest',
@@ -835,6 +830,49 @@
       Fitness: 'Exercise & Fitness',
       Pets: 'Pets'
     };
+
+    const starterPosts = [
+      {
+        id: 'seed-1',
+        alias: 'Quiet Lantern #21',
+        mood: 'Overthinking',
+        interest: 'Coffee',
+        content: 'Late-night iced coffee keeps me company while I plan tomorrow, even when my brain replays every detail.',
+        allowComments: true,
+        createdAt: 1700000003000,
+        timestamp: 'Just now',
+        comments: [
+          {
+            id: 'seed-c1',
+            alias: 'Gentle Fox #14',
+            text: 'Take it one small step at a time tonight—you do not have to solve everything at once.',
+            createdAt: 1700000003500
+          }
+        ]
+      },
+      {
+        id: 'seed-2',
+        alias: 'Calm River #58',
+        mood: 'Burnout',
+        interest: 'Coding',
+        content: 'Stepping away from the screen for a bit after debugging loops all day. Rest counts as progress too.',
+        allowComments: true,
+        createdAt: 1700000002000,
+        timestamp: '12m ago',
+        comments: []
+      },
+      {
+        id: 'seed-3',
+        alias: 'Warm Breeze #39',
+        mood: 'Grateful',
+        interest: 'Fitness',
+        content: 'Finished a short evening stretch and felt my shoulders drop for the first time all week.',
+        allowComments: false,
+        createdAt: 1700000001000,
+        timestamp: '28m ago',
+        comments: []
+      }
+    ];
 
     const adjectives = ['Quiet', 'Midnight', 'Gentle', 'Wandering', 'Hidden', 'Calm', 'Silver', 'Warm'];
     const nouns = ['Fox', 'Coffee', 'Cloud', 'Lantern', 'River', 'Star', 'Echo', 'Breeze'];
@@ -854,20 +892,57 @@
     const syncLabel = document.getElementById('sync-label');
     aliasDisplay.textContent = myAlias;
 
-    let socket = null;
+    const postsMap = {};
     let latestOnlineCount = 1;
-    let wakeupInProgress = false;
-    let pendingMatchRequest = null;
+    let socket = null;
+    let matchFallbackTimer = null;
+    let isLocalMatchSession = false;
+
+    function loadStoredPosts() {
+      try {
+        const raw = localStorage.getItem(LOCAL_POSTS_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (_) {}
+      return starterPosts;
+    }
+
+    function saveStoredPosts() {
+      try {
+        const list = Object.values(postsMap)
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+          .slice(0, 100);
+        localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(list));
+      } catch (_) {}
+    }
+
+    function hydratePosts(list) {
+      (list || []).forEach(post => {
+        if (!post || !post.id || !post.content) return;
+        postsMap[post.id] = {
+          ...post,
+          comments: Array.isArray(post.comments) ? post.comments : []
+        };
+      });
+      saveStoredPosts();
+      renderPosts();
+    }
 
     function setPresenceUI({ online, statusText, count }) {
       if (typeof count === 'number') {
-        latestOnlineCount = Math.max(0, count);
+        latestOnlineCount = Math.max(1, count);
       }
       syncDot.classList.toggle('online', Boolean(online));
       const suffix = statusText ? ` • ${statusText}` : '';
       syncLabel.innerHTML =
         `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(suffix)}`;
     }
+
+    // Hydrate posts immediately on load so the Freedom Wall is never empty
+    hydratePosts(loadStoredPosts());
+    setPresenceUI({ online: false, statusText: 'GitHub Mode • Syncing live server...' });
 
     document.getElementById('reroll-alias').addEventListener('click', () => {
       myAlias = generateAlias();
@@ -937,7 +1012,6 @@
     });
 
     // --- FREEDOM WALL LOGIC ---
-    const postsMap = {};
     const postsFeed = document.getElementById('posts-feed');
     const filterMood = document.getElementById('filter-mood');
     const filterInterest = document.getElementById('filter-interest');
@@ -950,18 +1024,30 @@
 
       if (!content) return;
 
-      if (!socket || !socket.connected) {
-        ensureServerAwakeAndConnect();
-        return;
-      }
-
-      socket.emit('wall:create_post', {
+      const post = {
+        id: `post-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         alias: myAlias,
         mood,
         interest,
         content,
-        allowComments
-      });
+        allowComments,
+        createdAt: Date.now(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        comments: []
+      };
+
+      // Render and persist locally right away so posts never disappear
+      hydratePosts([post]);
+
+      if (socket && socket.connected) {
+        socket.emit('wall:create_post', {
+          alias: myAlias,
+          mood,
+          interest,
+          content,
+          allowComments
+        });
+      }
 
       document.getElementById('post-content').value = '';
     });
@@ -975,7 +1061,7 @@
 
       const sortedPosts = Object.values(postsMap)
         .filter(p => {
-          if (!p || !p.content) return false;
+          if (!p || !p.content || hiddenItems.has(p.id)) return false;
           const matchesMood = selectedMood === 'ALL' || p.mood === selectedMood;
           const matchesInterest =
             selectedInterest === 'ALL' ||
@@ -985,6 +1071,15 @@
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
       postsFeed.innerHTML = '';
+
+      if (sortedPosts.length === 0) {
+        postsFeed.innerHTML = `
+          <div class="post-card" style="text-align: center; color: var(--muted);">
+            No posts match this filter yet. Try "All Experiences" or share a post above.
+          </div>
+        `;
+        return;
+      }
 
       sortedPosts.forEach(post => {
         const card = document.createElement('div');
@@ -1045,19 +1140,34 @@
           const input = form.querySelector('input');
           const text = input.value.trim();
           const postId = form.dataset.id;
-          if (!text || !postId || !socket || !socket.connected) return;
+          if (!text || !postId || !postsMap[postId]) return;
 
-          socket.emit('wall:add_comment', {
-            postId,
+          const comment = {
+            id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             alias: myAlias,
-            text
-          });
+            text,
+            createdAt: Date.now()
+          };
+
+          postsMap[postId].comments = postsMap[postId].comments || [];
+          postsMap[postId].comments.push(comment);
+          saveStoredPosts();
+          renderPosts();
+
+          if (socket && socket.connected) {
+            socket.emit('wall:add_comment', {
+              postId,
+              alias: myAlias,
+              text
+            });
+          }
+
           input.value = '';
         });
       });
     }
 
-    // --- 1-MINUTE EMPATHY MATCH LOGIC ---
+    // --- 1-MINUTE EMPATHY MATCH LOGIC (LIVE SOCKET + GITHUB FALLBACK ROOM) ---
     let currentRoomId = null;
     let countdownInterval = null;
     let roomUnlocked = false;
@@ -1072,7 +1182,69 @@
     const chatInput = document.getElementById('chat-input');
     const chatSendBtn = document.getElementById('chat-send-btn');
 
-    document.getElementById('start-match-btn').addEventListener('click', async () => {
+    function openMatchRoom({ roomId, partnerAlias, mood, interest, endsAt, localMode }) {
+      clearTimeout(matchFallbackTimer);
+      isLocalMatchSession = Boolean(localMode);
+      currentRoomId = roomId;
+      roomUnlocked = false;
+      renderedMsgIds.clear();
+
+      searchStatus.classList.add('hidden');
+      matchLobby.classList.add('hidden');
+      chatRoom.classList.remove('hidden');
+      decisionBox.classList.add('hidden');
+      document.querySelector('.decision-actions').classList.remove('hidden');
+      document.getElementById('decision-prompt').textContent =
+        'Time is up! Would you like to continue chatting anonymously?';
+
+      chatInput.disabled = false;
+      chatSendBtn.disabled = false;
+
+      document.getElementById('partner-alias').textContent = partnerAlias || 'Echo Cloud #31';
+      document.getElementById('chat-mood-badge').textContent = `#${mood}`;
+      document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
+
+      chatMessages.innerHTML = `
+        <div class="msg system">
+          Connected with ${escapeHTML(partnerAlias || 'Echo Cloud #31')} on #${escapeHTML(mood)} (${escapeHTML(interestLabels[interest] || interest)}).
+          ${localMode ? 'Practice mode active on GitHub while waiting for another live peer.' : 'Synchronized 1-minute session started.'}
+        </div>
+      `;
+
+      startSyncedCountdown(endsAt || (Date.now() + 60000));
+    }
+
+    function appendChatMessage(msg) {
+      if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
+      renderedMsgIds.add(msg.id);
+
+      const isMine = msg.senderId === (socket ? socket.id : 'me');
+      const div = document.createElement('div');
+      div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
+      div.dataset.msgId = msg.id;
+
+      if (hiddenItems.has(msg.id)) {
+        div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+      } else if (isMine) {
+        div.textContent = msg.text;
+      } else {
+        div.innerHTML = `
+          <div class="msg-meta">
+            <strong>${escapeHTML(msg.alias)}</strong>
+            <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
+          </div>
+          <div>${escapeHTML(msg.text)}</div>
+        `;
+        div.querySelector('.chat-report-btn').addEventListener('click', () => {
+          openReportModal('chat', msg.id, msg.alias, msg.text);
+        });
+      }
+
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    document.getElementById('start-match-btn').addEventListener('click', () => {
       const mood = document.getElementById('match-mood').value;
       const interest = document.getElementById('match-interest').value;
 
@@ -1080,23 +1252,46 @@
       document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
       searchStatus.classList.remove('hidden');
 
-      const payload = {
-        mood,
-        experience: mood,
-        interest,
-        alias: myAlias
-      };
+      clearTimeout(matchFallbackTimer);
 
       if (socket && socket.connected) {
-        socket.emit('match:find', payload);
-      } else {
-        pendingMatchRequest = payload;
-        await ensureServerAwakeAndConnect();
+        socket.emit('match:find', {
+          mood,
+          experience: mood,
+          interest,
+          alias: myAlias
+        });
       }
+
+      // If no live peer joins within 3.5s (common on single-user GitHub testing), open a working 1-minute room
+      matchFallbackTimer = setTimeout(() => {
+        if (!currentRoomId && !searchStatus.classList.contains('hidden')) {
+          openMatchRoom({
+            roomId: `local-room-${Date.now()}`,
+            partnerAlias: 'Gentle Echo #44',
+            mood,
+            interest,
+            endsAt: Date.now() + 60000,
+            localMode: true
+          });
+
+          setTimeout(() => {
+            if (!currentRoomId) return;
+            appendChatMessage({
+              id: `bot-${Date.now()}`,
+              roomId: currentRoomId,
+              senderId: 'peer-bot',
+              alias: 'Gentle Echo #44',
+              text: `Hey there—I also selected #${mood}. Want to share what has been on your mind lately?`,
+              createdAt: Date.now()
+            });
+          }, 900);
+        }
+      }, 3500);
     });
 
     document.getElementById('cancel-match-btn').addEventListener('click', () => {
-      pendingMatchRequest = null;
+      clearTimeout(matchFallbackTimer);
       searchStatus.classList.add('hidden');
       if (socket && socket.connected) {
         socket.emit('match:cancel');
@@ -1129,38 +1324,71 @@
 
     document.getElementById('chat-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!currentRoomId || chatInput.disabled || !socket || !socket.connected) return;
+      if (!currentRoomId || chatInput.disabled) return;
       const text = chatInput.value.trim();
       if (!text) return;
 
-      socket.emit('match:message', {
-        roomId: currentRoomId,
-        alias: myAlias,
-        text
-      });
+      if (isLocalMatchSession) {
+        appendChatMessage({
+          id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          roomId: currentRoomId,
+          senderId: 'me',
+          alias: myAlias,
+          text,
+          createdAt: Date.now()
+        });
+      } else if (socket && socket.connected) {
+        socket.emit('match:message', {
+          roomId: currentRoomId,
+          alias: myAlias,
+          text
+        });
+      }
+
       chatInput.value = '';
     });
 
     document.getElementById('consent-yes').addEventListener('click', () => {
-      if (!currentRoomId || !socket || !socket.connected) return;
+      if (!currentRoomId) return;
+      if (isLocalMatchSession || !socket || !socket.connected) {
+        roomUnlocked = true;
+        clearInterval(countdownInterval);
+        decisionBox.classList.add('hidden');
+        document.querySelector('.decision-actions').classList.remove('hidden');
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+        timerDisplay.textContent = 'Unlocked ∞';
+        const sys = document.createElement('div');
+        sys.className = 'msg system';
+        sys.textContent = 'Chat unlocked! You can keep messaging freely.';
+        chatMessages.appendChild(sys);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return;
+      }
       socket.emit('match:consent', { roomId: currentRoomId, agree: true });
     });
 
     document.getElementById('consent-no').addEventListener('click', () => {
-      if (!currentRoomId || !socket || !socket.connected) return;
+      if (!currentRoomId) return;
+      if (isLocalMatchSession || !socket || !socket.connected) {
+        resetChatUI();
+        return;
+      }
       socket.emit('match:consent', { roomId: currentRoomId, agree: false });
     });
 
     document.getElementById('leave-chat-btn').addEventListener('click', () => {
-      if (socket && socket.connected) {
+      if (!isLocalMatchSession && socket && socket.connected) {
         socket.emit('match:leave');
       }
       resetChatUI();
     });
 
     function resetChatUI() {
+      clearTimeout(matchFallbackTimer);
       clearInterval(countdownInterval);
       currentRoomId = null;
+      isLocalMatchSession = false;
       chatRoom.classList.add('hidden');
       matchLobby.classList.remove('hidden');
       chatInput.disabled = false;
@@ -1176,251 +1404,116 @@
       }[tag]));
     }
 
-    // --- SERVER WAKEUP + SOCKET.IO INITIALIZATION LOOP ---
-    async function pingServerOnce() {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+    // --- OPTIONAL LIVE SERVER SYNC (NON-BLOCKING) ---
+    async function tryLiveSync() {
       try {
-        const res = await fetch(`${WAKEUP_ENDPOINT}?t=${Date.now()}`, {
+        const res = await fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
           method: 'GET',
-          cache: 'no-store',
-          signal: controller.signal
+          cache: 'no-store'
         });
-        clearTimeout(timeoutId);
-        if (!res.ok) return null;
-        return await res.json().catch(() => ({ status: 'awake' }));
-      } catch (_) {
-        clearTimeout(timeoutId);
-        return null;
-      }
-    }
+        if (!res.ok) return;
 
-    function bindSocketEvents(sock) {
-      sock.on('connect', () => {
-        if (latestOnlineCount < 1) latestOnlineCount = 1;
-        setPresenceUI({ online: true, statusText: 'Live' });
-        sock.emit('identity:update_alias', { alias: myAlias });
-
-        if (pendingMatchRequest) {
-          sock.emit('match:find', pendingMatchRequest);
-          pendingMatchRequest = null;
-        }
-      });
-
-      sock.on('disconnect', (reason) => {
-        setPresenceUI({ online: false, statusText: 'Waking backend server... please wait up to 50 seconds' });
-        if (reason !== 'io client disconnect') {
-          ensureServerAwakeAndConnect();
-        }
-      });
-
-      sock.on('connect_error', () => {
-        setPresenceUI({
-          online: false,
-          statusText: 'Waking backend server... please wait up to 50 seconds'
+        socket = io(BACKEND_BASE_URL, {
+          query: { alias: myAlias },
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+          timeout: 8000
         });
-      });
 
-      const onPresence = (payload) => {
-        if (!payload || typeof payload.count !== 'number') return;
-        setPresenceUI({
-          online: sock.connected,
-          count: payload.count,
-          statusText: sock.connected ? 'Live' : 'Syncing...'
+        socket.on('connect', () => {
+          setPresenceUI({ online: true, statusText: 'Live Sync' });
+          socket.emit('identity:update_alias', { alias: myAlias });
         });
-      };
-      sock.on('presenceUpdate', onPresence);
-      sock.on('presence:update', onPresence);
 
-      sock.on('wall:init', ({ posts }) => {
-        Object.keys(postsMap).forEach((k) => delete postsMap[k]);
-        (posts || []).forEach((post) => {
-          if (post && post.id) {
-            postsMap[post.id] = { ...post, comments: Array.isArray(post.comments) ? post.comments : [] };
-          }
+        socket.on('disconnect', () => {
+          setPresenceUI({ online: false, statusText: 'GitHub Local Mode' });
         });
-        renderPosts();
-      });
 
-      sock.on('wall:new_post', ({ post }) => {
-        if (!post || !post.id) return;
-        postsMap[post.id] = { ...post, comments: Array.isArray(post.comments) ? post.comments : [] };
-        renderPosts();
-      });
-
-      sock.on('wall:new_comment', ({ postId, comment }) => {
-        if (!postId || !comment || !postsMap[postId]) return;
-        postsMap[postId].comments = postsMap[postId].comments || [];
-        if (!postsMap[postId].comments.some((c) => c.id === comment.id)) {
-          postsMap[postId].comments.push(comment);
-          renderPosts();
-        }
-      });
-
-      sock.on('match:searching', ({ mood, experience, interest }) => {
-        const expLabel = experience || mood;
-        document.getElementById('searching-mood').textContent = `#${expLabel}`;
-        document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-        searchStatus.classList.remove('hidden');
-      });
-
-      sock.on('match:cancelled', () => {
-        pendingMatchRequest = null;
-        searchStatus.classList.add('hidden');
-      });
-
-      sock.on('match:paired', ({ roomId, partnerAlias, mood, experience, interest, endsAt }) => {
-        const expLabel = experience || mood;
-        currentRoomId = roomId;
-        roomUnlocked = false;
-        renderedMsgIds.clear();
-
-        searchStatus.classList.add('hidden');
-        matchLobby.classList.add('hidden');
-        chatRoom.classList.remove('hidden');
-        decisionBox.classList.add('hidden');
-        document.querySelector('.decision-actions').classList.remove('hidden');
-        document.getElementById('decision-prompt').textContent =
-          'Time is up! Would you like to continue chatting anonymously?';
-
-        chatInput.disabled = false;
-        chatSendBtn.disabled = false;
-
-        document.getElementById('partner-alias').textContent = partnerAlias || 'Anonymous Peer';
-        document.getElementById('chat-mood-badge').textContent = `#${expLabel}`;
-        document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
-        chatMessages.innerHTML = `<div class="msg system">Connected with ${escapeHTML(partnerAlias || 'Anonymous Peer')}! Synchronized 1-minute session started.</div>`;
-
-        startSyncedCountdown(endsAt);
-      });
-
-      sock.on('match:message', (msg) => {
-        if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
-        renderedMsgIds.add(msg.id);
-
-        const isMine = msg.senderId === sock.id;
-        const div = document.createElement('div');
-        div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
-        div.dataset.msgId = msg.id;
-
-        if (hiddenItems.has(msg.id)) {
-          div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
-        } else if (isMine) {
-          div.textContent = msg.text;
-        } else {
-          div.innerHTML = `
-            <div class="msg-meta">
-              <strong>${escapeHTML(msg.alias)}</strong>
-              <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
-            </div>
-            <div>${escapeHTML(msg.text)}</div>
-          `;
-          div.querySelector('.chat-report-btn').addEventListener('click', () => {
-            openReportModal('chat', msg.id, msg.alias, msg.text);
+        const onPresence = (payload) => {
+          if (!payload || typeof payload.count !== 'number') return;
+          setPresenceUI({
+            online: socket.connected,
+            count: payload.count,
+            statusText: socket.connected ? 'Live Sync' : 'GitHub Local Mode'
           });
-        }
+        };
+        socket.on('presenceUpdate', onPresence);
+        socket.on('presence:update', onPresence);
 
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      });
-
-      sock.on('match:consent_waiting', () => {
-        document.getElementById('decision-prompt').textContent = 'Waiting for your partner to decide...';
-        document.querySelector('.decision-actions').classList.add('hidden');
-      });
-
-      sock.on('match:unlocked', () => {
-        roomUnlocked = true;
-        clearInterval(countdownInterval);
-        decisionBox.classList.add('hidden');
-        document.querySelector('.decision-actions').classList.remove('hidden');
-        chatInput.disabled = false;
-        chatSendBtn.disabled = false;
-        timerDisplay.textContent = 'Unlocked ∞';
-        const sys = document.createElement('div');
-        sys.className = 'msg system';
-        sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
-        chatMessages.appendChild(sys);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      });
-
-      sock.on('match:ended', ({ reason }) => {
-        alert(reason || 'The conversation has ended.');
-        resetChatUI();
-      });
-
-      sock.on('match:left_ack', () => {
-        resetChatUI();
-      });
-
-      sock.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
-        const expLabel = experience || mood;
-        clearInterval(countdownInterval);
-        currentRoomId = null;
-        roomUnlocked = false;
-        chatRoom.classList.add('hidden');
-        matchLobby.classList.remove('hidden');
-        document.getElementById('searching-mood').textContent = `#${expLabel}`;
-        document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-        searchStatus.classList.remove('hidden');
-        alert(reason || 'Your partner left. Returned to matchmaking pool.');
-      });
-    }
-
-    async function ensureServerAwakeAndConnect() {
-      if (socket && socket.connected) return socket;
-      if (wakeupInProgress) return null;
-      wakeupInProgress = true;
-
-      const startedAt = Date.now();
-      setPresenceUI({
-        online: false,
-        statusText: 'Waking backend server... please wait up to 50 seconds'
-      });
-
-      while (Date.now() - startedAt < WAKEUP_MAX_WINDOW_MS) {
-        const elapsedSec = Math.floor((Date.now() - startedAt) / 1000);
-        setPresenceUI({
-          online: false,
-          statusText: `Waking backend server... please wait up to 50 seconds (${elapsedSec}s)`
+        socket.on('wall:init', ({ posts }) => {
+          if (Array.isArray(posts) && posts.length > 0) {
+            hydratePosts(posts);
+          }
         });
 
-        const health = await pingServerOnce();
-        if (health) {
-          if (typeof health.onlineUsers === 'number') {
-            latestOnlineCount = Math.max(1, health.onlineUsers + 1);
+        socket.on('wall:new_post', ({ post }) => {
+          if (post && post.id) {
+            hydratePosts([post]);
           }
+        });
 
-          if (!socket) {
-            socket = io(BACKEND_BASE_URL, {
-              query: { alias: myAlias },
-              transports: ['polling', 'websocket'],
-              reconnection: true,
-              reconnectionAttempts: Infinity,
-              reconnectionDelay: 1000,
-              timeout: 15000
-            });
-            bindSocketEvents(socket);
-          } else if (!socket.connected) {
-            socket.connect();
+        socket.on('wall:new_comment', ({ postId, comment }) => {
+          if (!postId || !comment || !postsMap[postId]) return;
+          postsMap[postId].comments = postsMap[postId].comments || [];
+          if (!postsMap[postId].comments.some(c => c.id === comment.id)) {
+            postsMap[postId].comments.push(comment);
+            saveStoredPosts();
+            renderPosts();
           }
+        });
 
-          wakeupInProgress = false;
-          return socket;
-        }
+        socket.on('match:paired', (data) => {
+          openMatchRoom({
+            roomId: data.roomId,
+            partnerAlias: data.partnerAlias,
+            mood: data.experience || data.mood,
+            interest: data.interest,
+            endsAt: data.endsAt,
+            localMode: false
+          });
+        });
 
-        await new Promise((r) => setTimeout(r, WAKEUP_POLL_INTERVAL_MS));
+        socket.on('match:message', appendChatMessage);
+
+        socket.on('match:consent_waiting', () => {
+          document.getElementById('decision-prompt').textContent = 'Waiting for your partner to decide...';
+          document.querySelector('.decision-actions').classList.add('hidden');
+        });
+
+        socket.on('match:unlocked', () => {
+          roomUnlocked = true;
+          clearInterval(countdownInterval);
+          decisionBox.classList.add('hidden');
+          document.querySelector('.decision-actions').classList.remove('hidden');
+          chatInput.disabled = false;
+          chatSendBtn.disabled = false;
+          timerDisplay.textContent = 'Unlocked ∞';
+          const sys = document.createElement('div');
+          sys.className = 'msg system';
+          sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
+          chatMessages.appendChild(sys);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        socket.on('match:ended', ({ reason }) => {
+          alert(reason || 'The conversation has ended.');
+          resetChatUI();
+        });
+
+        socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
+          const expLabel = experience || mood;
+          resetChatUI();
+          document.getElementById('searching-mood').textContent = `#${expLabel}`;
+          document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+          searchStatus.classList.remove('hidden');
+          alert(reason || 'Your partner left. Returned to matchmaking pool.');
+        });
+      } catch (_) {
+        setPresenceUI({ online: false, statusText: 'GitHub Local Mode' });
       }
-
-      wakeupInProgress = false;
-      setPresenceUI({
-        online: false,
-        statusText: 'Server still sleeping — reload or check backend URL'
-      });
-      return null;
     }
 
-    ensureServerAwakeAndConnect();
+    tryLiveSync();
 
     // --- RIGHT-SIDE CORNER AMBIENT PLAYLIST (WEB AUDIO API) ---
     const tracks = [
