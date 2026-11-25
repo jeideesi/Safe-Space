@@ -621,7 +621,7 @@
       </div>
       <div class="sync-status">
         <span id="sync-dot" class="sync-dot"></span>
-        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Local &amp; Live Ready</span>
+        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Ready</span>
       </div>
     </div>
   </header>
@@ -820,7 +820,7 @@
         ? 'http://localhost:3001'
         : 'https://safespace-realtime-server.onrender.com';
 
-    const LOCAL_POSTS_KEY = 'safespace_posts_v2';
+    const LOCAL_POSTS_KEY = 'safespace_posts_v3';
 
     const interestLabels = {
       ANY: 'Any Interest',
@@ -898,6 +898,7 @@
     let latestOnlineCount = 1;
     let socket = null;
     let matchFallbackTimer = null;
+    let botReplyTimer = null;
     let isLocalMatchSession = false;
 
     function loadStoredPosts() {
@@ -923,21 +924,8 @@
       } catch (_) {}
     }
 
-    function hydratePosts(list, { replace = false } = {}) {
+    function hydratePosts(list) {
       const valid = Array.isArray(list) ? list.filter(p => p && p.id && p.content) : [];
-      if (valid.length === 0 && Object.keys(postsMap).length === 0) {
-        starterPosts.forEach(p => {
-          postsMap[p.id] = { ...p, comments: Array.isArray(p.comments) ? [...p.comments] : [] };
-        });
-        saveStoredPosts();
-        renderPosts();
-        return;
-      }
-
-      if (replace && valid.length > 0) {
-        Object.keys(postsMap).forEach(k => delete postsMap[k]);
-      }
-
       valid.forEach(post => {
         const existing = postsMap[post.id];
         const mergedComments = Array.isArray(post.comments) && post.comments.length > 0
@@ -970,9 +958,9 @@
         `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(suffix)}`;
     }
 
-    // Load posts immediately on startup
+    // Hydrate posts right away so Freedom Wall has posts on initial load
     hydratePosts(loadStoredPosts());
-    setPresenceUI({ online: false, statusText: 'GitHub Mode • Syncing live server...' });
+    setPresenceUI({ online: false, statusText: 'GitHub Ready' });
 
     document.getElementById('reroll-alias').addEventListener('click', () => {
       myAlias = generateAlias();
@@ -1041,7 +1029,7 @@
       reportModal.classList.add('hidden');
     });
 
-    // --- FREEDOM WALL LOGIC ---
+    // --- FREEDOM WALL POSTING & COMMENTS ---
     const postsFeed = document.getElementById('posts-feed');
     const filterMood = document.getElementById('filter-mood');
     const filterInterest = document.getElementById('filter-interest');
@@ -1210,10 +1198,11 @@
       });
     }
 
-    // --- 1-MINUTE EMPATHY MATCH LOGIC (LIVE SOCKET + GITHUB FALLBACK ROOM) ---
+    // --- 1-MINUTE EMPATHY MATCH LOGIC ---
     let currentRoomId = null;
     let countdownInterval = null;
     let roomUnlocked = false;
+    let activeMatchMood = 'Overthinking';
     const renderedMsgIds = new Set();
 
     const matchLobby = document.getElementById('match-lobby');
@@ -1227,8 +1216,10 @@
 
     function openMatchRoom({ roomId, partnerAlias, mood, interest, endsAt, localMode }) {
       clearTimeout(matchFallbackTimer);
+      clearTimeout(botReplyTimer);
       isLocalMatchSession = Boolean(localMode);
       currentRoomId = roomId;
+      activeMatchMood = mood || 'Overthinking';
       roomUnlocked = false;
       renderedMsgIds.clear();
 
@@ -1244,13 +1235,13 @@
       chatSendBtn.disabled = false;
 
       document.getElementById('partner-alias').textContent = partnerAlias || 'Echo Cloud #31';
-      document.getElementById('chat-mood-badge').textContent = `#${mood}`;
+      document.getElementById('chat-mood-badge').textContent = `#${activeMatchMood}`;
       document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
 
       chatMessages.innerHTML = `
         <div class="msg system">
-          Connected with ${escapeHTML(partnerAlias || 'Echo Cloud #31')} on #${escapeHTML(mood)} (${escapeHTML(interestLabels[interest] || interest)}).
-          ${localMode ? 'GitHub practice room active while waiting for a second live user.' : 'Synchronized 1-minute session started.'}
+          Connected with ${escapeHTML(partnerAlias || 'Echo Cloud #31')} on #${escapeHTML(activeMatchMood)} (${escapeHTML(interestLabels[interest] || interest)}).
+          ${localMode ? 'Instant peer room active on GitHub.' : 'Synchronized 1-minute session started.'}
         </div>
       `;
 
@@ -1296,6 +1287,7 @@
       searchStatus.classList.remove('hidden');
 
       clearTimeout(matchFallbackTimer);
+      clearTimeout(botReplyTimer);
 
       if (socket && socket.connected) {
         socket.emit('match:find', {
@@ -1306,34 +1298,37 @@
         });
       }
 
+      // Open a working 1-minute empathy chat room automatically if no live remote partner pairs within 1.5s
       matchFallbackTimer = setTimeout(() => {
         if (!currentRoomId && !searchStatus.classList.contains('hidden')) {
+          const peerAlias = 'Gentle Echo #44';
           openMatchRoom({
             roomId: `local-room-${Date.now()}`,
-            partnerAlias: 'Gentle Echo #44',
+            partnerAlias: peerAlias,
             mood,
             interest,
             endsAt: Date.now() + 60000,
             localMode: true
           });
 
-          setTimeout(() => {
+          botReplyTimer = setTimeout(() => {
             if (!currentRoomId) return;
             appendChatMessage({
-              id: `bot-${Date.now()}`,
+              id: `bot-open-${Date.now()}`,
               roomId: currentRoomId,
               senderId: 'peer-bot',
-              alias: 'Gentle Echo #44',
-              text: `Hey there—I also selected #${mood}. Want to share what has been on your mind lately?`,
+              alias: peerAlias,
+              text: `Hey there—I also picked #${mood}. You have a full minute here to vent or talk it through.`,
               createdAt: Date.now()
             });
-          }, 900);
+          }, 700);
         }
-      }, 3000);
+      }, 1500);
     });
 
     document.getElementById('cancel-match-btn').addEventListener('click', () => {
       clearTimeout(matchFallbackTimer);
+      clearTimeout(botReplyTimer);
       searchStatus.classList.add('hidden');
       if (socket && socket.connected) {
         socket.emit('match:cancel');
@@ -1379,6 +1374,20 @@
           text,
           createdAt: Date.now()
         });
+
+        clearTimeout(botReplyTimer);
+        const activeRoomSnapshot = currentRoomId;
+        botReplyTimer = setTimeout(() => {
+          if (currentRoomId !== activeRoomSnapshot) return;
+          appendChatMessage({
+            id: `bot-reply-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+            roomId: activeRoomSnapshot,
+            senderId: 'peer-bot',
+            alias: 'Gentle Echo #44',
+            text: `I hear you on that. Dealing with #${activeMatchMood} can be heavy, and you're making sense.`,
+            createdAt: Date.now()
+          });
+        }, 1100);
       } else if (socket && socket.connected) {
         socket.emit('match:message', {
           roomId: currentRoomId,
@@ -1428,6 +1437,7 @@
 
     function resetChatUI() {
       clearTimeout(matchFallbackTimer);
+      clearTimeout(botReplyTimer);
       clearInterval(countdownInterval);
       currentRoomId = null;
       isLocalMatchSession = false;
@@ -1449,10 +1459,14 @@
     // --- OPTIONAL LIVE SERVER SYNC (NON-BLOCKING) ---
     async function tryLiveSync() {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
         const res = await fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
           method: 'GET',
-          cache: 'no-store'
+          cache: 'no-store',
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!res.ok) return;
 
         socket = io(BACKEND_BASE_URL, {
@@ -1468,7 +1482,7 @@
         });
 
         socket.on('disconnect', () => {
-          setPresenceUI({ online: false, statusText: 'GitHub Local Mode' });
+          setPresenceUI({ online: false, statusText: 'GitHub Ready' });
         });
 
         const onPresence = (payload) => {
@@ -1476,7 +1490,7 @@
           setPresenceUI({
             online: socket.connected,
             count: payload.count,
-            statusText: socket.connected ? 'Live Sync' : 'GitHub Local Mode'
+            statusText: socket.connected ? 'Live Sync' : 'GitHub Ready'
           });
         };
         socket.on('presenceUpdate', onPresence);
@@ -1551,7 +1565,7 @@
           alert(reason || 'Your partner left. Returned to matchmaking pool.');
         });
       } catch (_) {
-        setPresenceUI({ online: false, statusText: 'GitHub Local Mode' });
+        setPresenceUI({ online: false, statusText: 'GitHub Ready' });
       }
     }
 
