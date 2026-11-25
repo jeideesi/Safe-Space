@@ -1132,6 +1132,17 @@
         return `${adj} ${noun} #${num}`;
       }
 
+      function escapeHTML(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>'"]/g, tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag]));
+      }
+
       // --- TOAST HELPER (REPLACES BLOCKING ALERT DIALOGS) ---
       const statusToast = document.getElementById('status-toast');
       const statusToastText = document.getElementById('status-toast-text');
@@ -1215,11 +1226,14 @@
 
         [...existingComments, ...incomingComments].forEach(c => {
           if (!c || !c.text) return;
-          const sig = `${c.alias || ''}|${c.text.trim()}`;
+          const sig = `${c.alias || ''}|${String(c.text).trim()}`;
           if (c.id && byId.has(c.id)) return;
           if (sigSet.has(sig)) return;
-          if (c.id) byId.set(c.id, { ...c });
-          else byId.set(sig, { ...c, id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+          if (c.id) {
+            byId.set(c.id, { ...c });
+          } else {
+            byId.set(sig, { ...c, id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+          }
           sigSet.add(sig);
         });
 
@@ -1235,7 +1249,7 @@
               p &&
               existingId !== post.id &&
               p.alias === post.alias &&
-              p.content.trim() === post.content.trim() &&
+              String(p.content).trim() === String(post.content).trim() &&
               Math.abs((p.createdAt || 0) - (post.createdAt || 0)) < 15000
             );
           });
@@ -1295,7 +1309,8 @@
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
           btn.classList.add('active');
-          document.getElementById(btn.dataset.target).classList.add('active');
+          const targetView = document.getElementById(btn.dataset.target);
+          if (targetView) targetView.classList.add('active');
         });
       });
 
@@ -1340,10 +1355,12 @@
         sessionStorage.setItem('safespace_hidden_items', JSON.stringify([...hiddenItems]));
 
         if (pendingReport.targetType === 'chat') {
-          const msgEl = document.querySelector(`[data-msg-id="${CSS.escape(pendingReport.targetId)}"]`);
-          if (msgEl) {
-            msgEl.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
-          }
+          const allMsgEls = chatMessages.querySelectorAll('[data-msg-id]');
+          allMsgEls.forEach(msgEl => {
+            if (msgEl.dataset.msgId === pendingReport.targetId) {
+              msgEl.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+            }
+          });
         } else {
           renderPosts();
         }
@@ -1518,6 +1535,7 @@
             };
 
             postsMap[postId].comments = mergeComments(postsMap[postId].comments, [comment]);
+            input.value = '';
             saveStoredPosts();
             renderPosts();
 
@@ -1561,7 +1579,6 @@
       const USER_TAUGHT_QA_KEY = 'safespace_nlp_user_taught_qa_v1';
 
       const baseQaDataset = [
-        // Casual Greetings & SimSimi-Style Banter
         { q: "hi hello hey yo sup kamusta musta", a: "Hiii!! 🐣 So glad you dropped by! Spill the tea or tell me how your day's going—I'm all ears!", mood: "ALL" },
         { q: "good morning morning", a: "Good morning!! ☀️ Did you get enough sleep or are we running on iced coffee and hope today?", mood: "ALL" },
         { q: "good evening good night", a: "Good evening! 🌙 Winding down or about to overthink everything until 2 AM? Either way, I'm here with you!", mood: "ALL" },
@@ -1575,48 +1592,30 @@
         { q: "ok okay k sige", a: "Short and mysterious 👀 I see you! What else is floating around in your head right now?", mood: "ALL" },
         { q: "thank you thanks salamat ty", a: "Anytime, bestie!! 🐥 You never have to carry heavy stuff all by yourself. Need to talk more?", mood: "ALL" },
         { q: "bye goodbye see you later", a: "Take super good care of yourself out there! 💛 Come back whenever you need someone to talk to!", mood: "ALL" },
-
-        // Taglish / Filipino Casual Expressions
         { q: "pagod na ako pagod super tired", a: "Huy, pahinga ka muna kahit saglit! 🥺 You've been working so hard—what's been draining you the most lately?", mood: "Burnout" },
         { q: "ewan ko hindi ko alam di ko alam", a: "Valid!! Minsan talaga magulo lang yung utak natin at hindi kailangan ng sagot agad. Kwento mo lang kung anong nararamdaman mo.", mood: "Overthinking" },
         { q: "ang hirap ang sakit sobra", a: "Yakap nang mahigpit!! 🫂 Hindi madali yung pinagdadaanan mo ngayon, pero nandito lang ako para makinig.", mood: "Heartbreak" },
         { q: "walang makausap mag isa", a: "Nandito na ako!! 🐥 Hindi ka nag-iisa ngayon—chika mo lang kahit ano, walang judgment dito.", mood: "Lonely" },
-
-        // Need Someone to Talk To & Openers
         { q: "i need someone to talk to can we talk", a: "Need someone to talk to? We're right here! 💛 No filters needed—just type whatever's on your mind.", mood: "ALL" },
         { q: "i dont know what to say or where to start", a: "No pressure at all! Start with one word or tell me what you ate today—we'll take it from there 😊", mood: "ALL" },
         { q: "can i vent rant to you", a: "Vent away!! Caps lock, messy thoughts, long paragraphs—drop it all here, I'm listening.", mood: "ALL" },
-
-        // Overthinking & Anxiety
         { q: "i cant stop overthinking everything at night", a: "Ugh, 2 AM overthinking hits like a truck! 🧠 Pause for a second—is this something you can fix tonight, or is your brain just replaying reruns?", mood: "Overthinking" },
         { q: "what if i fail or make the wrong choice", a: "What if it actually turns out way better than your brain is predicting? Even wrong turns teach us something—you only need the next tiny step.", mood: "Overthinking" },
         { q: "my brain wont shut off racing thoughts anxious", a: "Deep breath in... and slow breath out! 🌬️ Name just one thing you can see or hold right now to ground yourself, then tell me what's looping.", mood: "Overthinking" },
         { q: "i keep replaying an awkward moment or mistake", a: "Promise you: everyone else already forgot about it and is busy worrying about their own awkward moments! Be gentle with yourself today.", mood: "Overthinking" },
-
-        // Burnout & Exhaustion
         { q: "im so burned out exhausted tired of everything", a: "Sounds like your battery is at 1%! 🪫 Rest isn't something you have to earn—when was the last time you did absolutely nothing guilt-free?", mood: "Burnout" },
         { q: "i have zero motivation to work or study anymore", a: "Zero motivation usually means your brain is overloaded, not lazy! Try doing just 5 tiny minutes, or take a real breather first.", mood: "Burnout" },
         { q: "too many responsibilities and no break", a: "You're juggling way too many plates right now! If you could drop just ONE thing today without consequences, what would it be?", mood: "Burnout" },
-
-        // Academic Pressure
         { q: "stressed about exams grades failing school university", a: "Grades measure one test on one day—they don't measure your intelligence or your future! 📚 Which subject is giving you the biggest headache?", mood: "AcademicPressure" },
         { q: "so many deadlines assignments due tomorrow i cant finish", a: "Deadline panic mode activated! 🚨 Forget the whole mountain—pick the easiest 10-minute piece first just to get moving!", mood: "AcademicPressure" },
         { q: "afraid of disappointing my parents or family", a: "Carrying family expectations on top of school stress is so heavy. Your mental health matters way more than perfection.", mood: "AcademicPressure" },
-
-        // Heartbreak & Relationships
         { q: "going through a breakup heartbreak miss my ex", a: "Heartbreak hurts in a way nobody prepares you for 💔 Missing someone while knowing things changed is totally normal—take it one hour at a time.", mood: "Heartbreak" },
         { q: "why does letting go hurt so much", a: "Because your feelings were real! Healing isn't a straight line—some days you'll feel okay, and some days it hits again. And that's okay.", mood: "Heartbreak" },
         { q: "feel ghosted betrayed by someone i trusted", a: "Being left without closure says everything about their communication and nothing about your worth. Glad you're talking it out instead of holding it in!", mood: "Heartbreak" },
-
-        // Loneliness & Isolation
         { q: "i feel so lonely even around other people", a: "Feeling lonely in a crowded room is the heaviest kind of quiet. I'm genuinely glad you opened up here—you're seen right now. 💛", mood: "Lonely" },
         { q: "nobody understands what im going through", a: "It's exhausting wearing an 'I'm fine' mask all day. You can take the mask off here—tell me what's really going on.", mood: "Lonely" },
-
-        // Gratitude & Positivity
         { q: "i feel grateful today something good happened", a: "YESSS!! 🎉 Tell me everything—what good thing happened today?!", mood: "Grateful" },
         { q: "small win proud of myself today", a: "Big cheers for small wins!! 🥳 You deserve to celebrate every step forward!", mood: "Grateful" },
-
-        // Shared Interests
         { q: "iced coffee cafe drink late night", a: "Iced coffee solves 80% of life's problems (scientifically unproven, emotionally true) ☕ What's your go-to order?", mood: "ALL" },
         { q: "coding programming debugging tech computer", a: "Nothing humbles a human faster than a missing semicolon 💻 What are you building or debugging right now?", mood: "ALL" },
         { q: "gaming video games relaxing", a: "Gaming is the ultimate escape hatch when real life gets noisy 🎮 What have you been playing lately?", mood: "ALL" },
@@ -1649,7 +1648,6 @@
 
       updateDatasetCountBadge();
 
-      // NLP Preprocessing: Normalization, Stopword Removal, Lightweight Stemming & Bigrams
       const nlpStopwords = new Set([
         'a', 'an', 'the', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
         'to', 'of', 'in', 'on', 'at', 'for', 'with', 'about', 'into', 'through',
@@ -1686,7 +1684,6 @@
         return features;
       }
 
-      // TF-IDF Cosine Similarity Retrieval Engine
       function retrieveConversationalResponse(userQuery, mood, interest) {
         const dataset = getCombinedQaDataset();
         const queryTokens = extractNlpFeatures(userQuery);
@@ -1766,7 +1763,6 @@
         return moodFallbacks[mood] || "Oooh tell me more about that! 👀 I'm listening—what happened next?";
       }
 
-      // Interactive UI to teach new Q&A pairs to the NLP retrieval dataset
       document.getElementById('toggle-teach-ai-btn').addEventListener('click', () => {
         teachAiForm.classList.toggle('hidden');
         const qInput = document.getElementById('teach-question-input');
@@ -1804,6 +1800,7 @@
       function openMatchRoom({ roomId, partnerAlias, mood, interest, endsAt, localMode }) {
         clearTimeout(matchFallbackTimer);
         clearTimeout(botReplyTimer);
+        clearInterval(countdownInterval);
         isSearchingMatch = false;
         isLocalMatchSession = Boolean(localMode);
         currentRoomId = roomId;
@@ -1940,7 +1937,10 @@
         clearInterval(countdownInterval);
 
         const tick = () => {
-          if (roomUnlocked || !currentRoomId) return;
+          if (roomUnlocked || !currentRoomId) {
+            clearInterval(countdownInterval);
+            return;
+          }
           const remainingMs = Math.max(0, endsAt - Date.now());
           const totalSecs = Math.ceil(remainingMs / 1000);
           const mins = String(Math.floor(totalSecs / 60)).padStart(2, '0');
@@ -2071,22 +2071,12 @@
         timerDisplay.textContent = '01:00';
       }
 
-      function escapeHTML(str) {
-        if (str === null || str === undefined) return '';
-        return String(str).replace(/[&<>'"]/g, tag => ({
-          '&': '&amp;',
-          '<': '&lt;',
-          '>': '&gt;',
-          "'": '&#39;',
-          '"': '&quot;'
-        }[tag]));
-      }
-
       // --- OPTIONAL LIVE SERVER SYNC (NON-BLOCKING & COLLISION-SAFE) ---
       let liveSyncInitialized = false;
 
       function syncOfflinePostsToServer() {
         if (!socket || !socket.connected) return;
+        let updated = false;
         Object.values(postsMap).forEach(post => {
           if (!post || !post.id || post.id.startsWith('seed-') || post.synced) return;
           socket.emit('wall:create_post', {
@@ -2099,8 +2089,9 @@
             createdAt: post.createdAt
           });
           post.synced = true;
+          updated = true;
         });
-        saveStoredPosts();
+        if (updated) saveStoredPosts();
       }
 
       async function tryLiveSync() {
@@ -2170,14 +2161,27 @@
         });
 
         socket.on('wall:new_comment', ({ postId, comment }) => {
-          if (!postId || !comment || !postsMap[postId]) return;
+          if (!postId || !comment) return;
+          if (!postsMap[postId]) {
+            hydratePosts([{
+              id: postId,
+              alias: 'Anonymous',
+              mood: 'Overthinking',
+              interest: 'Coffee',
+              content: '',
+              allowComments: true,
+              createdAt: Date.now(),
+              comments: [comment]
+            }]);
+            return;
+          }
           postsMap[postId].comments = mergeComments(postsMap[postId].comments, [comment]);
           saveStoredPosts();
           renderPosts();
         });
 
         socket.on('match:paired', (data) => {
-          if (currentRoomId || isLocalMatchSession) return;
+          if (!data || currentRoomId || isLocalMatchSession) return;
           clearTimeout(matchFallbackTimer);
           openMatchRoom({
             roomId: data.roomId,
@@ -2216,19 +2220,20 @@
           chatMessages.scrollTop = chatMessages.scrollHeight;
         });
 
-        socket.on('match:ended', ({ reason }) => {
+        socket.on('match:ended', ({ reason } = {}) => {
           if (isLocalMatchSession) return;
           resetChatUI();
           showToast(reason || 'The conversation has ended.');
         });
 
-        socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
+        socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest } = {}) => {
           if (isLocalMatchSession) return;
-          const expLabel = experience || mood;
+          const expLabel = experience || mood || activeMatchMood;
+          const intLabel = interest || activeMatchInterest;
           resetChatUI();
           isSearchingMatch = true;
           document.getElementById('searching-mood').textContent = `#${expLabel}`;
-          document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+          document.getElementById('searching-interest').textContent = interestLabels[intLabel] || intLabel;
           searchStatus.classList.remove('hidden');
           showToast(reason || 'Your partner left. Returned to matchmaking pool.');
         });
@@ -2263,8 +2268,12 @@
 
       function stopAudioNodes() {
         activeNodes.forEach(node => {
-          try { node.stop(); } catch (_) {}
-          try { node.disconnect(); } catch (_) {}
+          if (typeof node.stop === 'function') {
+            try { node.stop(); } catch (_) {}
+          }
+          if (typeof node.disconnect === 'function') {
+            try { node.disconnect(); } catch (_) {}
+          }
         });
         activeNodes = [];
       }
@@ -2278,7 +2287,7 @@
 
       async function startTrack(index) {
         const seq = ++trackStartSeq;
-        currentTrackIdx = (index + tracks.length) % tracks.length;
+        currentTrackIdx = ((index % tracks.length) + tracks.length) % tracks.length;
         const track = tracks[currentTrackIdx];
 
         document.querySelectorAll('.playlist-item').forEach((el, idx) => {
@@ -2394,6 +2403,108 @@
       });
 
       volumeSlider.addEventListener('input', syncVolume);
+
+      // --- ADDED FEATURE: PERSISTENT POSTS WITHOUT A DATABASE ---
+      const PERSISTENT_ARCHIVE_KEY = 'safespace_persistent_archive_v1';
+
+      function persistAllPostsToArchive() {
+        try {
+          const allPosts = Object.values(postsMap)
+            .filter(p => p && p.id && p.content)
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          localStorage.setItem(PERSISTENT_ARCHIVE_KEY, JSON.stringify(allPosts));
+          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(allPosts.slice(0, 100)));
+        } catch (_) {}
+      }
+
+      document.getElementById('submit-post').addEventListener('click', () => {
+        setTimeout(persistAllPostsToArchive, 0);
+      });
+
+      postsFeed.addEventListener('submit', () => {
+        setTimeout(persistAllPostsToArchive, 0);
+      });
+
+      document.getElementById('restore-posts-btn').addEventListener('click', () => {
+        setTimeout(() => {
+          try {
+            const archived = JSON.parse(localStorage.getItem(PERSISTENT_ARCHIVE_KEY) || '[]');
+            const customPosts = Array.isArray(archived)
+              ? archived.filter(p => p && p.id && !String(p.id).startsWith('seed-'))
+              : [];
+            if (customPosts.length > 0) {
+              hydratePosts(customPosts);
+            }
+          } catch (_) {}
+          persistAllPostsToArchive();
+        }, 0);
+      });
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === LOCAL_POSTS_KEY || e.key === PERSISTENT_ARCHIVE_KEY) {
+          try {
+            const updated = JSON.parse(e.newValue || '[]');
+            if (Array.isArray(updated) && updated.length > 0) {
+              hydratePosts(updated);
+            }
+          } catch (_) {}
+        }
+      });
+
+      persistAllPostsToArchive();
+
+      // --- ADDED FEATURE: CROSS-DEVICE SHARED POSTS WITHOUT A DATABASE ---
+      const SHARED_JSON_BIN_URL = '';
+      const SHARED_JSON_API_KEY = '';
+
+      async function pullCrossDevicePosts() {
+        if (!SHARED_JSON_BIN_URL) return;
+        try {
+          const headers = { 'Accept': 'application/json' };
+          if (SHARED_JSON_API_KEY) headers['X-Master-Key'] = SHARED_JSON_API_KEY;
+
+          const res = await fetch(SHARED_JSON_BIN_URL, { headers, cache: 'no-store' });
+          if (!res.ok) return;
+          const data = await res.json();
+          const remotePosts = Array.isArray(data)
+            ? data
+            : (Array.isArray(data.record) ? data.record : (Array.isArray(data.posts) ? data.posts : []));
+
+          if (remotePosts.length > 0) {
+            hydratePosts(remotePosts);
+          }
+        } catch (_) {}
+      }
+
+      async function pushCrossDevicePosts() {
+        if (!SHARED_JSON_BIN_URL) return;
+        try {
+          const allPosts = Object.values(postsMap)
+            .filter(p => p && p.id && p.content)
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .slice(0, 100);
+
+          const headers = { 'Content-Type': 'application/json' };
+          if (SHARED_JSON_API_KEY) headers['X-Master-Key'] = SHARED_JSON_API_KEY;
+
+          await fetch(SHARED_JSON_BIN_URL, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(allPosts)
+          });
+        } catch (_) {}
+      }
+
+      document.getElementById('submit-post').addEventListener('click', () => {
+        setTimeout(pushCrossDevicePosts, 150);
+      });
+
+      postsFeed.addEventListener('submit', () => {
+        setTimeout(pushCrossDevicePosts, 150);
+      });
+
+      pullCrossDevicePosts();
+      setInterval(pullCrossDevicePosts, 15000);
     });
   </script>
 </body>
