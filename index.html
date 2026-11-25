@@ -620,7 +620,7 @@
         Your Session Alias: <strong id="user-alias">Loading...</strong>
         <button id="reroll-alias" title="Generate new anonymous name">↻</button>
       </div>
-      <!-- Live presence count + server connection status -->
+      <!-- Live presence counter & Socket.io connection status -->
       <div class="sync-status">
         <span id="sync-dot" class="sync-dot"></span>
         <span id="sync-label">🟢 <strong id="active-users-count">1</strong> Users Active Online • Connecting...</span>
@@ -851,32 +851,56 @@
     const syncLabel = document.getElementById('sync-label');
     aliasDisplay.textContent = myAlias;
 
+    let latestOnlineCount = 1;
+
+    function renderPresenceBadge({ online, stateText }) {
+      syncDot.classList.toggle('online', Boolean(online));
+      const statusSuffix = stateText ? ` • ${stateText}` : '';
+      syncLabel.innerHTML =
+        `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(statusSuffix)}`;
+    }
+
     const socket = io(SOCKET_SERVER_URL, {
       query: { alias: myAlias },
-      transports: ['websocket', 'polling']
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 15000
     });
 
-    function updateSyncBanner(online, countText) {
-      const countVal = countText !== undefined ? countText : activeUsersCountEl.textContent;
-      syncDot.classList.toggle('online', Boolean(online));
-      syncLabel.innerHTML = online
-        ? `🟢 <strong id="active-users-count">${escapeHTML(countVal)}</strong> Users Active Online • Live sync`
-        : `🟡 <strong id="active-users-count">${escapeHTML(countVal)}</strong> Users Active Online • Connecting...`;
+    function handlePresencePayload(payload) {
+      if (!payload || typeof payload.count !== 'number') return;
+      latestOnlineCount = Math.max(0, payload.count);
+      renderPresenceBadge({
+        online: socket.connected,
+        stateText: socket.connected ? 'Live' : 'Reconnecting...'
+      });
     }
 
     socket.on('connect', () => {
-      updateSyncBanner(true);
+      if (latestOnlineCount < 1) latestOnlineCount = 1;
+      renderPresenceBadge({ online: true, stateText: 'Live' });
+      socket.emit('identity:update_alias', { alias: myAlias });
     });
 
-    socket.on('disconnect', () => {
-      updateSyncBanner(false);
+    socket.on('disconnect', (reason) => {
+      const label = reason === 'io server disconnect' ? 'Disconnected' : 'Reconnecting...';
+      renderPresenceBadge({ online: false, stateText: label });
     });
 
-    socket.on('presence:update', ({ count }) => {
-      if (typeof count === 'number') {
-        updateSyncBanner(socket.connected, String(count));
-      }
+    socket.on('connect_error', (err) => {
+      console.warn('Socket connection error:', err.message);
+      renderPresenceBadge({ online: false, stateText: 'Waking server / Retrying...' });
     });
+
+    socket.io.on('reconnect_attempt', () => {
+      renderPresenceBadge({ online: false, stateText: 'Reconnecting...' });
+    });
+
+    socket.on('presenceUpdate', handlePresencePayload);
+    socket.on('presence:update', handlePresencePayload);
 
     document.getElementById('reroll-alias').addEventListener('click', () => {
       myAlias = generateAlias();
