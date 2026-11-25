@@ -1807,129 +1807,158 @@
       }
 
       // --- OPTIONAL LIVE SERVER SYNC (NON-BLOCKING & COLLISION-SAFE) ---
+      let liveSyncInitialized = false;
+
+      function syncOfflinePostsToServer() {
+        if (!socket || !socket.connected) return;
+        Object.values(postsMap).forEach(post => {
+          if (!post || !post.id || post.id.startsWith('seed-') || post.synced) return;
+          socket.emit('wall:create_post', {
+            id: post.id,
+            alias: post.alias,
+            mood: post.mood,
+            interest: post.interest,
+            content: post.content,
+            allowComments: post.allowComments,
+            createdAt: post.createdAt
+          });
+          post.synced = true;
+        });
+        saveStoredPosts();
+      }
+
       async function tryLiveSync() {
+        if (liveSyncInitialized) return;
+
         if (typeof window.io !== 'function') {
           setPresenceUI({ online: false, statusText: 'Standalone Mode' });
+          setTimeout(tryLiveSync, 1500);
           return;
         }
 
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2500);
-          const res = await fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
-            method: 'GET',
-            cache: 'no-store',
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          if (!res.ok) return;
+        liveSyncInitialized = true;
+        setPresenceUI({ online: false, statusText: 'Waking Server...' });
 
-          socket = window.io(BACKEND_BASE_URL, {
-            query: { alias: myAlias },
-            transports: ['polling', 'websocket'],
-            reconnection: true,
-            timeout: 6000
-          });
+        // Send a background wake-up ping to Render's free tier (takes ~30s on cold start)
+        fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-store'
+        }).catch(() => {});
 
-          socket.on('connect', () => {
-            setPresenceUI({ online: true, statusText: 'Live Sync' });
-            socket.emit('identity:update_alias', { alias: myAlias });
-          });
+        // Connect Socket.IO directly with extended timeout & automatic retries so it wakes the server
+        socket = window.io(BACKEND_BASE_URL, {
+          query: { alias: myAlias },
+          transports: ['polling', 'websocket'],
+          reconnection: true,
+          reconnectionAttempts: Infinity,
+          reconnectionDelay: 2000,
+          reconnectionDelayMax: 10000,
+          timeout: 45000
+        });
 
-          socket.on('disconnect', () => {
-            setPresenceUI({ online: false, statusText: 'Standalone Mode' });
-          });
+        socket.on('connect', () => {
+          setPresenceUI({ online: true, statusText: 'Live Sync' });
+          socket.emit('identity:update_alias', { alias: myAlias });
+          syncOfflinePostsToServer();
+        });
 
-          const onPresence = (payload) => {
-            if (!payload || typeof payload.count !== 'number') return;
-            setPresenceUI({
-              online: socket.connected,
-              count: payload.count,
-              statusText: socket.connected ? 'Live Sync' : 'Standalone Mode'
-            });
-          };
-          socket.on('presenceUpdate', onPresence);
-          socket.on('presence:update', onPresence);
+        socket.on('connect_error', () => {
+          setPresenceUI({ online: false, statusText: 'Waking Server...' });
+        });
 
-          socket.on('wall:init', ({ posts }) => {
-            if (Array.isArray(posts) && posts.length > 0) {
-              hydratePosts(posts);
-            }
-          });
+        socket.on('disconnect', () => {
+          setPresenceUI({ online: false, statusText: 'Reconnecting...' });
+        });
 
-          socket.on('wall:new_post', ({ post }) => {
-            if (post && post.id) {
-              hydratePosts([post]);
-            }
+        const onPresence = (payload) => {
+          if (!payload || typeof payload.count !== 'number') return;
+          setPresenceUI({
+            online: socket.connected,
+            count: payload.count,
+            statusText: socket.connected ? 'Live Sync' : 'Reconnecting...'
           });
+        };
+        socket.on('presenceUpdate', onPresence);
+        socket.on('presence:update', onPresence);
 
-          socket.on('wall:new_comment', ({ postId, comment }) => {
-            if (!postId || !comment || !postsMap[postId]) return;
-            postsMap[postId].comments = mergeComments(postsMap[postId].comments, [comment]);
-            saveStoredPosts();
-            renderPosts();
-          });
+        socket.on('wall:init', ({ posts }) => {
+          if (Array.isArray(posts) && posts.length > 0) {
+            hydratePosts(posts);
+          }
+          syncOfflinePostsToServer();
+        });
 
-          socket.on('match:paired', (data) => {
-            // Prevent server match event from overriding an already-active local or remote chat
-            if (currentRoomId || isLocalMatchSession) return;
-            clearTimeout(matchFallbackTimer);
-            openMatchRoom({
-              roomId: data.roomId,
-              partnerAlias: data.partnerAlias,
-              mood: data.experience || data.mood,
-              interest: data.interest,
-              endsAt: data.endsAt,
-              localMode: false
-            });
-          });
+        socket.on('wall:new_post', ({ post }) => {
+          if (post && post.id) {
+            post.synced = true;
+            hydratePosts([post]);
+          }
+        });
 
-          socket.on('match:message', (msg) => {
-            if (isLocalMatchSession) return;
-            appendChatMessage(msg);
-          });
+        socket.on('wall:new_comment', ({ postId, comment }) => {
+          if (!postId || !comment || !postsMap[postId]) return;
+          postsMap[postId].comments = mergeComments(postsMap[postId].comments, [comment]);
+          saveStoredPosts();
+          renderPosts();
+        });
 
-          socket.on('match:consent_waiting', () => {
-            if (isLocalMatchSession) return;
-            decisionPrompt.textContent = 'Waiting for your partner to decide...';
-            decisionActions.classList.add('hidden');
+        socket.on('match:paired', (data) => {
+          // Prevent server match event from overriding an already-active local or remote chat
+          if (currentRoomId || isLocalMatchSession) return;
+          clearTimeout(matchFallbackTimer);
+          openMatchRoom({
+            roomId: data.roomId,
+            partnerAlias: data.partnerAlias,
+            mood: data.experience || data.mood,
+            interest: data.interest,
+            endsAt: data.endsAt,
+            localMode: false
           });
+        });
 
-          socket.on('match:unlocked', () => {
-            if (isLocalMatchSession) return;
-            roomUnlocked = true;
-            clearInterval(countdownInterval);
-            decisionBox.classList.add('hidden');
-            decisionActions.classList.remove('hidden');
-            chatInput.disabled = false;
-            chatSendBtn.disabled = false;
-            timerDisplay.textContent = 'Unlocked ∞';
-            const sys = document.createElement('div');
-            sys.className = 'msg system';
-            sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
-            chatMessages.appendChild(sys);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-          });
+        socket.on('match:message', (msg) => {
+          if (isLocalMatchSession) return;
+          appendChatMessage(msg);
+        });
 
-          socket.on('match:ended', ({ reason }) => {
-            if (isLocalMatchSession) return;
-            resetChatUI();
-            showToast(reason || 'The conversation has ended.');
-          });
+        socket.on('match:consent_waiting', () => {
+          if (isLocalMatchSession) return;
+          decisionPrompt.textContent = 'Waiting for your partner to decide...';
+          decisionActions.classList.add('hidden');
+        });
 
-          socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
-            if (isLocalMatchSession) return;
-            const expLabel = experience || mood;
-            resetChatUI();
-            isSearchingMatch = true;
-            document.getElementById('searching-mood').textContent = `#${expLabel}`;
-            document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-            searchStatus.classList.remove('hidden');
-            showToast(reason || 'Your partner left. Returned to matchmaking pool.');
-          });
-        } catch (_) {
-          setPresenceUI({ online: false, statusText: 'Standalone Mode' });
-        }
+        socket.on('match:unlocked', () => {
+          if (isLocalMatchSession) return;
+          roomUnlocked = true;
+          clearInterval(countdownInterval);
+          decisionBox.classList.add('hidden');
+          decisionActions.classList.remove('hidden');
+          chatInput.disabled = false;
+          chatSendBtn.disabled = false;
+          timerDisplay.textContent = 'Unlocked ∞';
+          const sys = document.createElement('div');
+          sys.className = 'msg system';
+          sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
+          chatMessages.appendChild(sys);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        socket.on('match:ended', ({ reason }) => {
+          if (isLocalMatchSession) return;
+          resetChatUI();
+          showToast(reason || 'The conversation has ended.');
+        });
+
+        socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
+          if (isLocalMatchSession) return;
+          const expLabel = experience || mood;
+          resetChatUI();
+          isSearchingMatch = true;
+          document.getElementById('searching-mood').textContent = `#${expLabel}`;
+          document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+          searchStatus.classList.remove('hidden');
+          showToast(reason || 'Your partner left. Returned to matchmaking pool.');
+        });
       }
 
       tryLiveSync();
