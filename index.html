@@ -620,10 +620,10 @@
         Your Session Alias: <strong id="user-alias">Loading...</strong>
         <button id="reroll-alias" title="Generate new anonymous name">↻</button>
       </div>
-      <!-- Live presence counter & Socket.io connection status -->
+      <!-- Live presence counter & server wakeup status -->
       <div class="sync-status">
         <span id="sync-dot" class="sync-dot"></span>
-        <span id="sync-label">🟢 <strong id="active-users-count">1</strong> Users Active Online • Connecting...</span>
+        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Waking backend server... please wait up to 50 seconds</span>
       </div>
     </div>
   </header>
@@ -815,11 +815,15 @@
   </aside>
 
   <script>
-    // --- SOCKET.IO SERVER CONNECTION (REPLACE WITH YOUR DEPLOYED RENDER URL) ---
-    const SOCKET_SERVER_URL =
+    // --- BACKEND SERVER & WAKEUP CONFIGURATION ---
+    const BACKEND_BASE_URL =
       window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:3001'
         : 'https://safespace-realtime-server.onrender.com';
+
+    const WAKEUP_ENDPOINT = `${BACKEND_BASE_URL}/api/health`;
+    const WAKEUP_MAX_WINDOW_MS = 65000;
+    const WAKEUP_POLL_INTERVAL_MS = 2500;
 
     const interestLabels = {
       ANY: 'Any Interest',
@@ -846,67 +850,32 @@
     sessionStorage.setItem('safespace_tab_alias', myAlias);
 
     const aliasDisplay = document.getElementById('user-alias');
-    const activeUsersCountEl = document.getElementById('active-users-count');
     const syncDot = document.getElementById('sync-dot');
     const syncLabel = document.getElementById('sync-label');
     aliasDisplay.textContent = myAlias;
 
+    let socket = null;
     let latestOnlineCount = 1;
+    let wakeupInProgress = false;
+    let pendingMatchRequest = null;
 
-    function renderPresenceBadge({ online, stateText }) {
+    function setPresenceUI({ online, statusText, count }) {
+      if (typeof count === 'number') {
+        latestOnlineCount = Math.max(0, count);
+      }
       syncDot.classList.toggle('online', Boolean(online));
-      const statusSuffix = stateText ? ` • ${stateText}` : '';
+      const suffix = statusText ? ` • ${statusText}` : '';
       syncLabel.innerHTML =
-        `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(statusSuffix)}`;
+        `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(suffix)}`;
     }
-
-    const socket = io(SOCKET_SERVER_URL, {
-      query: { alias: myAlias },
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 15000
-    });
-
-    function handlePresencePayload(payload) {
-      if (!payload || typeof payload.count !== 'number') return;
-      latestOnlineCount = Math.max(0, payload.count);
-      renderPresenceBadge({
-        online: socket.connected,
-        stateText: socket.connected ? 'Live' : 'Reconnecting...'
-      });
-    }
-
-    socket.on('connect', () => {
-      if (latestOnlineCount < 1) latestOnlineCount = 1;
-      renderPresenceBadge({ online: true, stateText: 'Live' });
-      socket.emit('identity:update_alias', { alias: myAlias });
-    });
-
-    socket.on('disconnect', (reason) => {
-      const label = reason === 'io server disconnect' ? 'Disconnected' : 'Reconnecting...';
-      renderPresenceBadge({ online: false, stateText: label });
-    });
-
-    socket.on('connect_error', (err) => {
-      console.warn('Socket connection error:', err.message);
-      renderPresenceBadge({ online: false, stateText: 'Waking server / Retrying...' });
-    });
-
-    socket.io.on('reconnect_attempt', () => {
-      renderPresenceBadge({ online: false, stateText: 'Reconnecting...' });
-    });
-
-    socket.on('presenceUpdate', handlePresencePayload);
-    socket.on('presence:update', handlePresencePayload);
 
     document.getElementById('reroll-alias').addEventListener('click', () => {
       myAlias = generateAlias();
       sessionStorage.setItem('safespace_tab_alias', myAlias);
       aliasDisplay.textContent = myAlias;
-      socket.emit('identity:update_alias', { alias: myAlias });
+      if (socket && socket.connected) {
+        socket.emit('identity:update_alias', { alias: myAlias });
+      }
     });
 
     // Tab Navigation
@@ -941,13 +910,15 @@
     document.getElementById('submit-report-btn').addEventListener('click', () => {
       if (!pendingReport) return;
 
-      socket.emit('moderation:report', {
-        targetType: pendingReport.targetType,
-        targetId: pendingReport.targetId,
-        authorAlias: pendingReport.authorAlias,
-        contentSnippet: pendingReport.text,
-        reason: reportReason.value
-      });
+      if (socket && socket.connected) {
+        socket.emit('moderation:report', {
+          targetType: pendingReport.targetType,
+          targetId: pendingReport.targetId,
+          authorAlias: pendingReport.authorAlias,
+          contentSnippet: pendingReport.text,
+          reason: reportReason.value
+        });
+      }
 
       hiddenItems.add(pendingReport.targetId);
       sessionStorage.setItem('safespace_hidden_items', JSON.stringify([...hiddenItems]));
@@ -965,41 +936,11 @@
       reportModal.classList.add('hidden');
     });
 
-    // --- SERVER-BACKED FREEDOM WALL LOGIC ---
+    // --- FREEDOM WALL LOGIC ---
     const postsMap = {};
     const postsFeed = document.getElementById('posts-feed');
     const filterMood = document.getElementById('filter-mood');
     const filterInterest = document.getElementById('filter-interest');
-
-    socket.on('wall:init', ({ posts }) => {
-      Object.keys(postsMap).forEach(k => delete postsMap[k]);
-      (posts || []).forEach(post => {
-        if (!post || !post.id) return;
-        postsMap[post.id] = {
-          ...post,
-          comments: Array.isArray(post.comments) ? post.comments : []
-        };
-      });
-      renderPosts();
-    });
-
-    socket.on('wall:new_post', ({ post }) => {
-      if (!post || !post.id) return;
-      postsMap[post.id] = {
-        ...post,
-        comments: Array.isArray(post.comments) ? post.comments : []
-      };
-      renderPosts();
-    });
-
-    socket.on('wall:new_comment', ({ postId, comment }) => {
-      if (!postId || !comment || !postsMap[postId]) return;
-      postsMap[postId].comments = postsMap[postId].comments || [];
-      if (!postsMap[postId].comments.some(c => c.id === comment.id)) {
-        postsMap[postId].comments.push(comment);
-        renderPosts();
-      }
-    });
 
     document.getElementById('submit-post').addEventListener('click', () => {
       const content = document.getElementById('post-content').value.trim();
@@ -1008,6 +949,11 @@
       const allowComments = document.getElementById('allow-comments').checked;
 
       if (!content) return;
+
+      if (!socket || !socket.connected) {
+        ensureServerAwakeAndConnect();
+        return;
+      }
 
       socket.emit('wall:create_post', {
         alias: myAlias,
@@ -1099,7 +1045,7 @@
           const input = form.querySelector('input');
           const text = input.value.trim();
           const postId = form.dataset.id;
-          if (!text || !postId) return;
+          if (!text || !postId || !socket || !socket.connected) return;
 
           socket.emit('wall:add_comment', {
             postId,
@@ -1111,7 +1057,7 @@
       });
     }
 
-    // --- SYNCHRONIZED 1-MINUTE EMPATHY MATCH LOGIC ---
+    // --- 1-MINUTE EMPATHY MATCH LOGIC ---
     let currentRoomId = null;
     let countdownInterval = null;
     let roomUnlocked = false;
@@ -1126,7 +1072,7 @@
     const chatInput = document.getElementById('chat-input');
     const chatSendBtn = document.getElementById('chat-send-btn');
 
-    document.getElementById('start-match-btn').addEventListener('click', () => {
+    document.getElementById('start-match-btn').addEventListener('click', async () => {
       const mood = document.getElementById('match-mood').value;
       const interest = document.getElementById('match-interest').value;
 
@@ -1134,49 +1080,27 @@
       document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
       searchStatus.classList.remove('hidden');
 
-      socket.emit('match:find', {
+      const payload = {
         mood,
+        experience: mood,
         interest,
         alias: myAlias
-      });
+      };
+
+      if (socket && socket.connected) {
+        socket.emit('match:find', payload);
+      } else {
+        pendingMatchRequest = payload;
+        await ensureServerAwakeAndConnect();
+      }
     });
 
     document.getElementById('cancel-match-btn').addEventListener('click', () => {
-      socket.emit('match:cancel');
-    });
-
-    socket.on('match:searching', ({ mood, interest }) => {
-      document.getElementById('searching-mood').textContent = `#${mood}`;
-      document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-      searchStatus.classList.remove('hidden');
-    });
-
-    socket.on('match:cancelled', () => {
+      pendingMatchRequest = null;
       searchStatus.classList.add('hidden');
-    });
-
-    socket.on('match:paired', ({ roomId, partnerAlias, mood, interest, endsAt }) => {
-      currentRoomId = roomId;
-      roomUnlocked = false;
-      renderedMsgIds.clear();
-
-      searchStatus.classList.add('hidden');
-      matchLobby.classList.add('hidden');
-      chatRoom.classList.remove('hidden');
-      decisionBox.classList.add('hidden');
-      document.querySelector('.decision-actions').classList.remove('hidden');
-      document.getElementById('decision-prompt').textContent =
-        'Time is up! Would you like to continue chatting anonymously?';
-
-      chatInput.disabled = false;
-      chatSendBtn.disabled = false;
-
-      document.getElementById('partner-alias').textContent = partnerAlias || 'Anonymous Peer';
-      document.getElementById('chat-mood-badge').textContent = `#${mood}`;
-      document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
-      chatMessages.innerHTML = `<div class="msg system">Connected with ${escapeHTML(partnerAlias || 'Anonymous Peer')}! Both of you relate to #${escapeHTML(mood)}. Synchronized 1-minute session started.</div>`;
-
-      startSyncedCountdown(endsAt);
+      if (socket && socket.connected) {
+        socket.emit('match:cancel');
+      }
     });
 
     function startSyncedCountdown(endsAt) {
@@ -1205,7 +1129,7 @@
 
     document.getElementById('chat-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!currentRoomId || chatInput.disabled) return;
+      if (!currentRoomId || chatInput.disabled || !socket || !socket.connected) return;
       const text = chatInput.value.trim();
       if (!text) return;
 
@@ -1217,91 +1141,21 @@
       chatInput.value = '';
     });
 
-    socket.on('match:message', (msg) => {
-      if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
-      renderedMsgIds.add(msg.id);
-
-      const isMine = msg.senderId === socket.id;
-      const div = document.createElement('div');
-      div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
-      div.dataset.msgId = msg.id;
-
-      if (hiddenItems.has(msg.id)) {
-        div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
-      } else if (isMine) {
-        div.textContent = msg.text;
-      } else {
-        div.innerHTML = `
-          <div class="msg-meta">
-            <strong>${escapeHTML(msg.alias)}</strong>
-            <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
-          </div>
-          <div>${escapeHTML(msg.text)}</div>
-        `;
-        div.querySelector('.chat-report-btn').addEventListener('click', () => {
-          openReportModal('chat', msg.id, msg.alias, msg.text);
-        });
-      }
-
-      chatMessages.appendChild(div);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
     document.getElementById('consent-yes').addEventListener('click', () => {
-      if (!currentRoomId) return;
+      if (!currentRoomId || !socket || !socket.connected) return;
       socket.emit('match:consent', { roomId: currentRoomId, agree: true });
     });
 
     document.getElementById('consent-no').addEventListener('click', () => {
-      if (!currentRoomId) return;
+      if (!currentRoomId || !socket || !socket.connected) return;
       socket.emit('match:consent', { roomId: currentRoomId, agree: false });
     });
 
-    socket.on('match:consent_waiting', () => {
-      document.getElementById('decision-prompt').textContent = 'Waiting for your partner to decide...';
-      document.querySelector('.decision-actions').classList.add('hidden');
-    });
-
-    socket.on('match:unlocked', () => {
-      roomUnlocked = true;
-      clearInterval(countdownInterval);
-      decisionBox.classList.add('hidden');
-      document.querySelector('.decision-actions').classList.remove('hidden');
-      chatInput.disabled = false;
-      chatSendBtn.disabled = false;
-      timerDisplay.textContent = 'Unlocked ∞';
-      const sys = document.createElement('div');
-      sys.className = 'msg system';
-      sys.textContent = 'Both of you agreed to continue! Private anonymous chat unlocked.';
-      chatMessages.appendChild(sys);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    });
-
-    socket.on('match:ended', ({ reason }) => {
-      alert(reason || 'The conversation has ended.');
-      resetChatUI();
-    });
-
     document.getElementById('leave-chat-btn').addEventListener('click', () => {
-      socket.emit('match:leave');
+      if (socket && socket.connected) {
+        socket.emit('match:leave');
+      }
       resetChatUI();
-    });
-
-    socket.on('match:left_ack', () => {
-      resetChatUI();
-    });
-
-    socket.on('match:partner_left_requeued', ({ reason, mood, interest }) => {
-      clearInterval(countdownInterval);
-      currentRoomId = null;
-      roomUnlocked = false;
-      chatRoom.classList.add('hidden');
-      matchLobby.classList.remove('hidden');
-
-      document.getElementById('searching-mood').textContent = `#${mood}`;
-      document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-      searchStatus.classList.remove('hidden');
-      alert(reason || 'Your chat partner left. You have been returned to the matchmaking pool.');
     });
 
     function resetChatUI() {
@@ -1321,6 +1175,252 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
       }[tag]));
     }
+
+    // --- SERVER WAKEUP + SOCKET.IO INITIALIZATION LOOP ---
+    async function pingServerOnce() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      try {
+        const res = await fetch(`${WAKEUP_ENDPOINT}?t=${Date.now()}`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) return null;
+        return await res.json().catch(() => ({ status: 'awake' }));
+      } catch (_) {
+        clearTimeout(timeoutId);
+        return null;
+      }
+    }
+
+    function bindSocketEvents(sock) {
+      sock.on('connect', () => {
+        if (latestOnlineCount < 1) latestOnlineCount = 1;
+        setPresenceUI({ online: true, statusText: 'Live' });
+        sock.emit('identity:update_alias', { alias: myAlias });
+
+        if (pendingMatchRequest) {
+          sock.emit('match:find', pendingMatchRequest);
+          pendingMatchRequest = null;
+        }
+      });
+
+      sock.on('disconnect', (reason) => {
+        setPresenceUI({ online: false, statusText: 'Waking backend server... please wait up to 50 seconds' });
+        if (reason !== 'io client disconnect') {
+          ensureServerAwakeAndConnect();
+        }
+      });
+
+      sock.on('connect_error', () => {
+        setPresenceUI({
+          online: false,
+          statusText: 'Waking backend server... please wait up to 50 seconds'
+        });
+      });
+
+      const onPresence = (payload) => {
+        if (!payload || typeof payload.count !== 'number') return;
+        setPresenceUI({
+          online: sock.connected,
+          count: payload.count,
+          statusText: sock.connected ? 'Live' : 'Syncing...'
+        });
+      };
+      sock.on('presenceUpdate', onPresence);
+      sock.on('presence:update', onPresence);
+
+      sock.on('wall:init', ({ posts }) => {
+        Object.keys(postsMap).forEach((k) => delete postsMap[k]);
+        (posts || []).forEach((post) => {
+          if (post && post.id) {
+            postsMap[post.id] = { ...post, comments: Array.isArray(post.comments) ? post.comments : [] };
+          }
+        });
+        renderPosts();
+      });
+
+      sock.on('wall:new_post', ({ post }) => {
+        if (!post || !post.id) return;
+        postsMap[post.id] = { ...post, comments: Array.isArray(post.comments) ? post.comments : [] };
+        renderPosts();
+      });
+
+      sock.on('wall:new_comment', ({ postId, comment }) => {
+        if (!postId || !comment || !postsMap[postId]) return;
+        postsMap[postId].comments = postsMap[postId].comments || [];
+        if (!postsMap[postId].comments.some((c) => c.id === comment.id)) {
+          postsMap[postId].comments.push(comment);
+          renderPosts();
+        }
+      });
+
+      sock.on('match:searching', ({ mood, experience, interest }) => {
+        const expLabel = experience || mood;
+        document.getElementById('searching-mood').textContent = `#${expLabel}`;
+        document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+        searchStatus.classList.remove('hidden');
+      });
+
+      sock.on('match:cancelled', () => {
+        pendingMatchRequest = null;
+        searchStatus.classList.add('hidden');
+      });
+
+      sock.on('match:paired', ({ roomId, partnerAlias, mood, experience, interest, endsAt }) => {
+        const expLabel = experience || mood;
+        currentRoomId = roomId;
+        roomUnlocked = false;
+        renderedMsgIds.clear();
+
+        searchStatus.classList.add('hidden');
+        matchLobby.classList.add('hidden');
+        chatRoom.classList.remove('hidden');
+        decisionBox.classList.add('hidden');
+        document.querySelector('.decision-actions').classList.remove('hidden');
+        document.getElementById('decision-prompt').textContent =
+          'Time is up! Would you like to continue chatting anonymously?';
+
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+
+        document.getElementById('partner-alias').textContent = partnerAlias || 'Anonymous Peer';
+        document.getElementById('chat-mood-badge').textContent = `#${expLabel}`;
+        document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
+        chatMessages.innerHTML = `<div class="msg system">Connected with ${escapeHTML(partnerAlias || 'Anonymous Peer')}! Synchronized 1-minute session started.</div>`;
+
+        startSyncedCountdown(endsAt);
+      });
+
+      sock.on('match:message', (msg) => {
+        if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
+        renderedMsgIds.add(msg.id);
+
+        const isMine = msg.senderId === sock.id;
+        const div = document.createElement('div');
+        div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
+        div.dataset.msgId = msg.id;
+
+        if (hiddenItems.has(msg.id)) {
+          div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+        } else if (isMine) {
+          div.textContent = msg.text;
+        } else {
+          div.innerHTML = `
+            <div class="msg-meta">
+              <strong>${escapeHTML(msg.alias)}</strong>
+              <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
+            </div>
+            <div>${escapeHTML(msg.text)}</div>
+          `;
+          div.querySelector('.chat-report-btn').addEventListener('click', () => {
+            openReportModal('chat', msg.id, msg.alias, msg.text);
+          });
+        }
+
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      sock.on('match:consent_waiting', () => {
+        document.getElementById('decision-prompt').textContent = 'Waiting for your partner to decide...';
+        document.querySelector('.decision-actions').classList.add('hidden');
+      });
+
+      sock.on('match:unlocked', () => {
+        roomUnlocked = true;
+        clearInterval(countdownInterval);
+        decisionBox.classList.add('hidden');
+        document.querySelector('.decision-actions').classList.remove('hidden');
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+        timerDisplay.textContent = 'Unlocked ∞';
+        const sys = document.createElement('div');
+        sys.className = 'msg system';
+        sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
+        chatMessages.appendChild(sys);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      sock.on('match:ended', ({ reason }) => {
+        alert(reason || 'The conversation has ended.');
+        resetChatUI();
+      });
+
+      sock.on('match:left_ack', () => {
+        resetChatUI();
+      });
+
+      sock.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
+        const expLabel = experience || mood;
+        clearInterval(countdownInterval);
+        currentRoomId = null;
+        roomUnlocked = false;
+        chatRoom.classList.add('hidden');
+        matchLobby.classList.remove('hidden');
+        document.getElementById('searching-mood').textContent = `#${expLabel}`;
+        document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+        searchStatus.classList.remove('hidden');
+        alert(reason || 'Your partner left. Returned to matchmaking pool.');
+      });
+    }
+
+    async function ensureServerAwakeAndConnect() {
+      if (socket && socket.connected) return socket;
+      if (wakeupInProgress) return null;
+      wakeupInProgress = true;
+
+      const startedAt = Date.now();
+      setPresenceUI({
+        online: false,
+        statusText: 'Waking backend server... please wait up to 50 seconds'
+      });
+
+      while (Date.now() - startedAt < WAKEUP_MAX_WINDOW_MS) {
+        const elapsedSec = Math.floor((Date.now() - startedAt) / 1000);
+        setPresenceUI({
+          online: false,
+          statusText: `Waking backend server... please wait up to 50 seconds (${elapsedSec}s)`
+        });
+
+        const health = await pingServerOnce();
+        if (health) {
+          if (typeof health.onlineUsers === 'number') {
+            latestOnlineCount = Math.max(1, health.onlineUsers + 1);
+          }
+
+          if (!socket) {
+            socket = io(BACKEND_BASE_URL, {
+              query: { alias: myAlias },
+              transports: ['polling', 'websocket'],
+              reconnection: true,
+              reconnectionAttempts: Infinity,
+              reconnectionDelay: 1000,
+              timeout: 15000
+            });
+            bindSocketEvents(socket);
+          } else if (!socket.connected) {
+            socket.connect();
+          }
+
+          wakeupInProgress = false;
+          return socket;
+        }
+
+        await new Promise((r) => setTimeout(r, WAKEUP_POLL_INTERVAL_MS));
+      }
+
+      wakeupInProgress = false;
+      setPresenceUI({
+        online: false,
+        statusText: 'Server still sleeping — reload or check backend URL'
+      });
+      return null;
+    }
+
+    ensureServerAwakeAndConnect();
 
     // --- RIGHT-SIDE CORNER AMBIENT PLAYLIST (WEB AUDIO API) ---
     const tracks = [
