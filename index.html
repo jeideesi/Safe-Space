@@ -691,6 +691,8 @@
           <option value="Fitness">Exercise &amp; Fitness</option>
           <option value="Pets">Pets</option>
         </select>
+
+        <button id="restore-posts-btn" type="button" class="secondary-btn">Restore Posts</button>
       </div>
 
       <div id="posts-feed" class="feed"></div>
@@ -818,7 +820,7 @@
         ? 'http://localhost:3001'
         : 'https://safespace-realtime-server.onrender.com';
 
-    const LOCAL_POSTS_KEY = 'safespace_local_posts_v1';
+    const LOCAL_POSTS_KEY = 'safespace_posts_v2';
 
     const interestLabels = {
       ANY: 'Any Interest',
@@ -912,20 +914,48 @@
     function saveStoredPosts() {
       try {
         const list = Object.values(postsMap)
+          .filter(p => p && p.id && p.content)
           .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
           .slice(0, 100);
-        localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(list));
+        if (list.length > 0) {
+          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(list));
+        }
       } catch (_) {}
     }
 
-    function hydratePosts(list) {
-      (list || []).forEach(post => {
-        if (!post || !post.id || !post.content) return;
+    function hydratePosts(list, { replace = false } = {}) {
+      const valid = Array.isArray(list) ? list.filter(p => p && p.id && p.content) : [];
+      if (valid.length === 0 && Object.keys(postsMap).length === 0) {
+        starterPosts.forEach(p => {
+          postsMap[p.id] = { ...p, comments: Array.isArray(p.comments) ? [...p.comments] : [] };
+        });
+        saveStoredPosts();
+        renderPosts();
+        return;
+      }
+
+      if (replace && valid.length > 0) {
+        Object.keys(postsMap).forEach(k => delete postsMap[k]);
+      }
+
+      valid.forEach(post => {
+        const existing = postsMap[post.id];
+        const mergedComments = Array.isArray(post.comments) && post.comments.length > 0
+          ? post.comments
+          : (existing && Array.isArray(existing.comments) ? existing.comments : []);
         postsMap[post.id] = {
+          ...existing,
           ...post,
-          comments: Array.isArray(post.comments) ? post.comments : []
+          comments: mergedComments
         };
       });
+
+      if (Object.keys(postsMap).length === 0) {
+        starterPosts.forEach(p => {
+          postsMap[p.id] = { ...p, comments: Array.isArray(p.comments) ? [...p.comments] : [] };
+        });
+      }
+
       saveStoredPosts();
       renderPosts();
     }
@@ -940,7 +970,7 @@
         `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(suffix)}`;
     }
 
-    // Hydrate posts immediately on load so the Freedom Wall is never empty
+    // Load posts immediately on startup
     hydratePosts(loadStoredPosts());
     setPresenceUI({ online: false, statusText: 'GitHub Mode • Syncing live server...' });
 
@@ -1016,6 +1046,14 @@
     const filterMood = document.getElementById('filter-mood');
     const filterInterest = document.getElementById('filter-interest');
 
+    document.getElementById('restore-posts-btn').addEventListener('click', () => {
+      filterMood.value = 'ALL';
+      filterInterest.value = 'ALL';
+      hiddenItems.clear();
+      sessionStorage.removeItem('safespace_hidden_items');
+      hydratePosts(starterPosts);
+    });
+
     document.getElementById('submit-post').addEventListener('click', () => {
       const content = document.getElementById('post-content').value.trim();
       const mood = document.getElementById('post-mood').value;
@@ -1036,7 +1074,6 @@
         comments: []
       };
 
-      // Render and persist locally right away so posts never disappear
       hydratePosts([post]);
 
       if (socket && socket.connected) {
@@ -1056,6 +1093,12 @@
     filterInterest.addEventListener('change', renderPosts);
 
     function renderPosts() {
+      if (Object.keys(postsMap).length === 0) {
+        starterPosts.forEach(p => {
+          postsMap[p.id] = { ...p, comments: Array.isArray(p.comments) ? [...p.comments] : [] };
+        });
+      }
+
       const selectedMood = filterMood.value;
       const selectedInterest = filterInterest.value;
 
@@ -1075,7 +1118,7 @@
       if (sortedPosts.length === 0) {
         postsFeed.innerHTML = `
           <div class="post-card" style="text-align: center; color: var(--muted);">
-            No posts match this filter yet. Try "All Experiences" or share a post above.
+            No posts match this filter yet. Click "Restore Posts" or set filters back to All.
           </div>
         `;
         return;
@@ -1207,7 +1250,7 @@
       chatMessages.innerHTML = `
         <div class="msg system">
           Connected with ${escapeHTML(partnerAlias || 'Echo Cloud #31')} on #${escapeHTML(mood)} (${escapeHTML(interestLabels[interest] || interest)}).
-          ${localMode ? 'Practice mode active on GitHub while waiting for another live peer.' : 'Synchronized 1-minute session started.'}
+          ${localMode ? 'GitHub practice room active while waiting for a second live user.' : 'Synchronized 1-minute session started.'}
         </div>
       `;
 
@@ -1263,7 +1306,6 @@
         });
       }
 
-      // If no live peer joins within 3.5s (common on single-user GitHub testing), open a working 1-minute room
       matchFallbackTimer = setTimeout(() => {
         if (!currentRoomId && !searchStatus.classList.contains('hidden')) {
           openMatchRoom({
@@ -1287,7 +1329,7 @@
             });
           }, 900);
         }
-      }, 3500);
+      }, 3000);
     });
 
     document.getElementById('cancel-match-btn').addEventListener('click', () => {
