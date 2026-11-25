@@ -2456,55 +2456,118 @@
       // --- ADDED FEATURE: CROSS-DEVICE SHARED POSTS WITHOUT A DATABASE ---
       const SHARED_JSON_BIN_URL = '';
       const SHARED_JSON_API_KEY = '';
+      const JSONBLOB_API_BASE = 'https://jsonblob.com/api/jsonBlob';
+      let activeSharedBlobUrl = SHARED_JSON_BIN_URL || '';
+      let isSyncingRemote = false;
 
-      async function pullCrossDevicePosts() {
-        if (!SHARED_JSON_BIN_URL) return;
-        try {
-          const headers = { 'Accept': 'application/json' };
-          if (SHARED_JSON_API_KEY) headers['X-Master-Key'] = SHARED_JSON_API_KEY;
-
-          const res = await fetch(SHARED_JSON_BIN_URL, { headers, cache: 'no-store' });
-          if (!res.ok) return;
-          const data = await res.json();
-          const remotePosts = Array.isArray(data)
-            ? data
-            : (Array.isArray(data.record) ? data.record : (Array.isArray(data.posts) ? data.posts : []));
-
-          if (remotePosts.length > 0) {
-            hydratePosts(remotePosts);
-          }
-        } catch (_) {}
+      function extractPostsArray(payload) {
+        if (Array.isArray(payload)) return payload;
+        if (payload && Array.isArray(payload.posts)) return payload.posts;
+        if (payload && Array.isArray(payload.record)) return payload.record;
+        return [];
       }
 
-      async function pushCrossDevicePosts() {
-        if (!SHARED_JSON_BIN_URL) return;
+      async function ensureSharedBlobUrl() {
+        if (activeSharedBlobUrl) return activeSharedBlobUrl;
+
+        const savedUrl = localStorage.getItem('safespace_shared_blob_url');
+        if (savedUrl) {
+          activeSharedBlobUrl = savedUrl;
+          return activeSharedBlobUrl;
+        }
+
         try {
-          const allPosts = Object.values(postsMap)
+          const initialPosts = Object.values(postsMap)
             .filter(p => p && p.id && p.content)
             .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
             .slice(0, 100);
 
-          const headers = { 'Content-Type': 'application/json' };
+          const res = await fetch(JSONBLOB_API_BASE, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(initialPosts)
+          });
+
+          const locationHeader = res.headers.get('Location');
+          let createdUrl = locationHeader || '';
+
+          if (!createdUrl) {
+            const data = await res.json().catch(() => null);
+            if (data && data.id) {
+              createdUrl = `${JSONBLOB_API_BASE}/${data.id}`;
+            }
+          }
+
+          if (createdUrl) {
+            if (createdUrl.startsWith('http://')) {
+              createdUrl = createdUrl.replace('http://', 'https://');
+            }
+            activeSharedBlobUrl = createdUrl;
+            localStorage.setItem('safespace_shared_blob_url', createdUrl);
+            console.log('SafeSpace Shared Feed URL:', createdUrl);
+          }
+        } catch (_) {}
+
+        return activeSharedBlobUrl;
+      }
+
+      async function syncPostsAcrossDevices(pushLocalChanges = false) {
+        if (isSyncingRemote) return;
+        isSyncingRemote = true;
+
+        try {
+          const blobUrl = await ensureSharedBlobUrl();
+          if (!blobUrl) return;
+
+          const headers = { 'Accept': 'application/json' };
           if (SHARED_JSON_API_KEY) headers['X-Master-Key'] = SHARED_JSON_API_KEY;
 
-          await fetch(SHARED_JSON_BIN_URL, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(allPosts)
-          });
-        } catch (_) {}
+          const getRes = await fetch(blobUrl, { headers, cache: 'no-store' });
+          if (getRes.ok) {
+            const remoteData = await getRes.json();
+            const remotePosts = extractPostsArray(remoteData);
+            if (remotePosts.length > 0) {
+              hydratePosts(remotePosts);
+              persistAllPostsToArchive();
+            }
+          }
+
+          if (pushLocalChanges) {
+            const mergedList = Object.values(postsMap)
+              .filter(p => p && p.id && p.content)
+              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+              .slice(0, 100);
+
+            const putHeaders = {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            };
+            if (SHARED_JSON_API_KEY) putHeaders['X-Master-Key'] = SHARED_JSON_API_KEY;
+
+            await fetch(blobUrl, {
+              method: 'PUT',
+              headers: putHeaders,
+              body: JSON.stringify(mergedList)
+            });
+          }
+        } catch (_) {} finally {
+          isSyncingRemote = false;
+        }
       }
 
       document.getElementById('submit-post').addEventListener('click', () => {
-        setTimeout(pushCrossDevicePosts, 150);
+        setTimeout(() => syncPostsAcrossDevices(true), 200);
       });
 
       postsFeed.addEventListener('submit', () => {
-        setTimeout(pushCrossDevicePosts, 150);
+        setTimeout(() => syncPostsAcrossDevices(true), 200);
       });
 
-      pullCrossDevicePosts();
-      setInterval(pullCrossDevicePosts, 15000);
+      syncPostsAcrossDevices(false);
+      setInterval(() => syncPostsAcrossDevices(false), 5000);
     });
   </script>
 </body>
