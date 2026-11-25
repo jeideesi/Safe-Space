@@ -32,7 +32,7 @@
       line-height: 1.6;
       max-width: 760px;
       margin: 0 auto;
-      padding: 1.5rem 1rem;
+      padding: 1.5rem 1rem 6rem;
     }
 
     header {
@@ -127,8 +127,14 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.8rem;
+      gap: 0.6rem;
       margin-top: 0.8rem;
+    }
+
+    .select-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
 
     .composer-controls select {
@@ -159,6 +165,20 @@
       background: var(--accent-hover);
     }
 
+    .secondary-btn {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .secondary-btn:hover {
+      border-color: var(--accent);
+    }
+
     .danger-btn {
       background: var(--danger);
       color: #fff;
@@ -170,8 +190,9 @@
 
     .filter-bar {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 0.8rem;
+      gap: 0.6rem;
       margin-bottom: 1rem;
       font-size: 0.9rem;
       color: var(--muted);
@@ -185,9 +206,18 @@
     .post-header {
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.4rem;
       font-size: 0.85rem;
       color: var(--muted);
       margin-bottom: 0.5rem;
+    }
+
+    .badge-group {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
     }
 
     .badge {
@@ -197,6 +227,11 @@
       border-radius: 4px;
       font-size: 0.75rem;
       border: 1px solid var(--border);
+    }
+
+    .badge.interest {
+      color: #d6ccc2;
+      border-color: #4a443f;
     }
 
     .post-body {
@@ -219,11 +254,30 @@
     }
 
     .comment-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.6rem;
       font-size: 0.85rem;
       background: var(--bg);
       padding: 0.5rem 0.7rem;
       border-radius: 5px;
       margin-bottom: 0.4rem;
+    }
+
+    .report-trigger {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.72rem;
+      cursor: pointer;
+      white-space: nowrap;
+      opacity: 0.75;
+    }
+
+    .report-trigger:hover {
+      color: var(--danger);
+      opacity: 1;
     }
 
     .comment-form {
@@ -245,10 +299,28 @@
       padding: 2rem 1.2rem;
     }
 
-    .match-card select {
-      max-width: 260px;
-      display: block;
-      margin: 1rem auto;
+    .match-selectors {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.8rem;
+      margin: 1.2rem auto;
+      max-width: 520px;
+    }
+
+    .match-selectors .field-box {
+      flex: 1;
+      min-width: 200px;
+      text-align: left;
+    }
+
+    .match-selectors label {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .match-selectors select {
+      margin-top: 0.3rem;
     }
 
     .status-text {
@@ -263,19 +335,22 @@
       color: var(--danger);
       text-decoration: underline;
       cursor: pointer;
+      margin-left: 0.4rem;
     }
 
     .chat-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
       padding-bottom: 0.8rem;
       border-bottom: 1px solid var(--border);
     }
 
     .timer-box {
       font-weight: bold;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       color: var(--accent);
       background: var(--bg);
       padding: 0.3rem 0.8rem;
@@ -292,7 +367,7 @@
     }
 
     .msg {
-      max-width: 75%;
+      max-width: 78%;
       padding: 0.6rem 0.9rem;
       border-radius: 8px;
       font-size: 0.9rem;
@@ -311,12 +386,22 @@
       border: 1px solid var(--border);
     }
 
+    .msg-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 0.2rem;
+      font-size: 0.78rem;
+    }
+
     .msg.system {
       align-self: center;
       background: none;
       color: var(--muted);
       font-size: 0.8rem;
       font-style: italic;
+      text-align: center;
     }
 
     .decision-box {
@@ -343,6 +428,148 @@
     .chat-input-area input {
       margin-top: 0;
     }
+
+    /* REPORT MODAL */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.3rem;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .modal-card h4 {
+      color: var(--accent);
+      margin-bottom: 0.4rem;
+    }
+
+    .modal-quote {
+      background: var(--bg);
+      border-left: 3px solid var(--danger);
+      padding: 0.5rem 0.7rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 0.7rem 0;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    /* RIGHT-SIDE CORNER AMBIENT PLAYLIST */
+    .music-widget {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      width: 265px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      z-index: 900;
+      overflow: hidden;
+    }
+
+    .music-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.55rem 0.85rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .music-body {
+      padding: 0.75rem 0.85rem;
+    }
+
+    .music-widget.collapsed .music-body {
+      display: none;
+    }
+
+    .track-now {
+      font-size: 0.82rem;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .music-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .music-controls button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.3rem 0.6rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .music-controls button.playing {
+      background: var(--accent);
+      color: #181716;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .music-controls input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .playlist-list {
+      list-style: none;
+      border-top: 1px solid var(--border);
+      padding-top: 0.45rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .playlist-item {
+      font-size: 0.78rem;
+      color: var(--muted);
+      padding: 0.3rem 0.45rem;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .playlist-item:hover, .playlist-item.active {
+      background: var(--bg);
+      color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -368,16 +595,28 @@
       <div class="composer-card">
         <h3>Share what you're going through</h3>
         <textarea id="post-content" rows="3" placeholder="Write your thoughts anonymously..."></textarea>
-        
+
         <div class="composer-controls">
-          <select id="post-mood">
-            <option value="Overthinking">#Overthinking</option>
-            <option value="Burnout">#Burnout</option>
-            <option value="AcademicPressure">#AcademicPressure</option>
-            <option value="Heartbreak">#Heartbreak</option>
-            <option value="Lonely">#Lonely</option>
-            <option value="Grateful">#Grateful</option>
-          </select>
+          <div class="select-group">
+            <select id="post-mood" title="Experience / Mood">
+              <option value="Overthinking">#Overthinking</option>
+              <option value="Burnout">#Burnout</option>
+              <option value="AcademicPressure">#AcademicPressure</option>
+              <option value="Heartbreak">#Heartbreak</option>
+              <option value="Lonely">#Lonely</option>
+              <option value="Grateful">#Grateful</option>
+            </select>
+
+            <select id="post-interest" title="Interest Tag">
+              <option value="Coffee">Iced Coffee</option>
+              <option value="Coding">Coding &amp; Tech</option>
+              <option value="Gaming">Gaming</option>
+              <option value="Music">Music</option>
+              <option value="Design">Graphic Design</option>
+              <option value="Fitness">Exercise &amp; Fitness</option>
+              <option value="Pets">Pets</option>
+            </select>
+          </div>
 
           <label class="toggle-label">
             <input type="checkbox" id="allow-comments" checked />
@@ -389,7 +628,7 @@
       </div>
 
       <div class="filter-bar">
-        <span>Filter by experience:</span>
+        <span>Filter by experience &amp; interest:</span>
         <select id="filter-mood">
           <option value="ALL">All Experiences</option>
           <option value="Overthinking">#Overthinking</option>
@@ -398,6 +637,17 @@
           <option value="Heartbreak">#Heartbreak</option>
           <option value="Lonely">#Lonely</option>
           <option value="Grateful">#Grateful</option>
+        </select>
+
+        <select id="filter-interest">
+          <option value="ALL">All Interests</option>
+          <option value="Coffee">Iced Coffee</option>
+          <option value="Coding">Coding &amp; Tech</option>
+          <option value="Gaming">Gaming</option>
+          <option value="Music">Music</option>
+          <option value="Design">Graphic Design</option>
+          <option value="Fitness">Exercise &amp; Fitness</option>
+          <option value="Pets">Pets</option>
         </select>
       </div>
 
@@ -408,19 +658,47 @@
     <section id="match-section" class="view">
       <div id="match-lobby" class="match-card">
         <h2>Find Someone Who Relates</h2>
-        <p>Select what you are experiencing right now. We will connect you anonymously with someone feeling the same way for a 1-minute conversation.</p>
-        
-        <select id="match-mood">
-          <option value="Overthinking">#Overthinking</option>
-          <option value="Burnout">#Burnout</option>
-          <option value="AcademicPressure">#AcademicPressure</option>
-          <option value="Heartbreak">#Heartbreak</option>
-          <option value="Lonely">#Lonely</option>
-          <option value="Grateful">#Grateful</option>
-        </select>
+        <p>Select your current experience and a shared interest. We will connect you anonymously for a 1-minute empathy chat.</p>
+
+        <div class="match-selectors">
+          <div class="field-box">
+            <label for="match-mood">1. What you're experiencing</label>
+            <select id="match-mood">
+              <option value="Overthinking">#Overthinking</option>
+              <option value="Burnout">#Burnout</option>
+              <option value="AcademicPressure">#AcademicPressure</option>
+              <option value="Heartbreak">#Heartbreak</option>
+              <option value="Lonely">#Lonely</option>
+              <option value="Grateful">#Grateful</option>
+            </select>
+          </div>
+
+          <div class="field-box">
+            <label for="match-interest">2. Shared interest</label>
+            <select id="match-interest">
+              <option value="ANY">Any Interest</option>
+              <option value="Coffee">Iced Coffee</option>
+              <option value="Coding">Coding &amp; Tech</option>
+              <option value="Gaming">Gaming</option>
+              <option value="Music">Music</option>
+              <option value="Design">Graphic Design</option>
+              <option value="Fitness">Exercise &amp; Fitness</option>
+              <option value="Pets">Pets</option>
+            </select>
+          </div>
+        </div>
 
         <button id="start-match-btn" class="primary-btn">Find a Match</button>
-        <p id="search-status" class="status-text hidden">Looking for someone experiencing <strong id="searching-mood"></strong>... <button id="cancel-match-btn" class="link-btn">Cancel</button></p>
+
+        <div id="search-status" class="status-text hidden">
+          <p>Looking for someone experiencing <strong id="searching-mood"></strong> (<span id="searching-interest"></span>)...
+            <button id="cancel-match-btn" class="link-btn">Cancel</button>
+          </p>
+          <p style="margin-top: 0.6rem; font-size: 0.82rem; color: var(--muted);">
+            No live peer online right now?
+            <button id="sim-match-btn" class="secondary-btn" style="margin-left: 0.4rem;">Connect with Empathy Listener</button>
+          </p>
+        </div>
       </div>
 
       <div id="chat-room" class="chat-card hidden">
@@ -428,6 +706,7 @@
           <div>
             <span>Chatting with <strong id="partner-alias"></strong></span>
             <span class="badge" id="chat-mood-badge"></span>
+            <span class="badge interest" id="chat-interest-badge"></span>
           </div>
           <div class="timer-box" id="timer-display">01:00</div>
           <button id="leave-chat-btn" class="danger-btn">Leave</button>
@@ -451,19 +730,76 @@
     </section>
   </main>
 
+  <!-- REPORT MODAL -->
+  <div id="report-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <h4>Report Content</h4>
+      <p style="font-size: 0.84rem; color: var(--muted);">Flagged content will be hidden from your view and logged for moderation.</p>
+      <div id="report-preview" class="modal-quote"></div>
+      <label for="report-reason" style="font-size: 0.82rem; color: var(--muted);">Reason:</label>
+      <select id="report-reason">
+        <option value="Harassment or hate speech">Harassment or hate speech</option>
+        <option value="Spam or advertising">Spam or advertising</option>
+        <option value="Self-harm or crisis concern">Self-harm or crisis concern</option>
+        <option value="Inappropriate or explicit content">Inappropriate or explicit content</option>
+      </select>
+      <div class="modal-actions">
+        <button id="cancel-report-btn" class="secondary-btn">Cancel</button>
+        <button id="submit-report-btn" class="danger-btn">Submit Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT-SIDE CORNER AMBIENT PLAYLIST WIDGET -->
+  <aside id="music-widget" class="music-widget">
+    <div id="music-toggle-header" class="music-header">
+      <span>🎵 SafeSpace Chill Radio</span>
+      <span id="music-collapse-icon">▾</span>
+    </div>
+    <div class="music-body">
+      <div id="track-now" class="track-now">Paused — Rainy Café Ambience</div>
+      <div class="music-controls">
+        <button id="prev-track-btn" title="Previous">⏮</button>
+        <button id="play-pause-btn" title="Play / Pause">▶ Play</button>
+        <button id="next-track-btn" title="Next">⏭</button>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.35" title="Volume" />
+      </div>
+      <ul id="playlist-list" class="playlist-list">
+        <li class="playlist-item active" data-index="0"><span>1. Rainy Café Ambience</span><span>☕</span></li>
+        <li class="playlist-item" data-index="1"><span>2. Midnight Lo-Fi Chords</span><span>🌙</span></li>
+        <li class="playlist-item" data-index="2"><span>3. Warm Hearth Drone</span><span>🔥</span></li>
+      </ul>
+    </div>
+  </aside>
+
   <script>
-    // Initialize Gun.js using public relay peers so users sync across devices without a backend
+    const interestLabels = {
+      Coffee: 'Iced Coffee',
+      Coding: 'Coding & Tech',
+      Gaming: 'Gaming',
+      Music: 'Music',
+      Design: 'Graphic Design',
+      Fitness: 'Exercise & Fitness',
+      Pets: 'Pets'
+    };
+
+    // Replace YOUR-RELAY-NAME with your hosted Gun relay URL once deployed
     const gun = Gun({
-      peers: ['https://gun-manhattan.herokuapp.com/gun', 'https://relay.peer.ooo/gun']
+      peers: [
+        'https://YOUR-RELAY-NAME.onrender.com/gun',
+        'https://peer.wallie.io/gun',
+        'https://gundb-relay-mlccl.ondigitalocean.app/gun'
+      ],
+      localStorage: true
     });
 
-    // Unique namespace for this app
-    const appDB = gun.get('safespace-freedom-wall-v1');
+    const appDB = gun.get('safespace-freedom-wall-v2');
     const postsDB = appDB.get('posts');
     const lobbyDB = appDB.get('match-lobby');
     const roomsDB = appDB.get('chat-rooms');
+    const reportsDB = appDB.get('reports');
 
-    // Generate Anonymous Session Identity
+    // Anonymous Session Identity
     const adjectives = ['Quiet', 'Midnight', 'Gentle', 'Wandering', 'Hidden', 'Calm', 'Silver', 'Warm'];
     const nouns = ['Fox', 'Coffee', 'Cloud', 'Lantern', 'River', 'Star', 'Echo', 'Breeze'];
 
@@ -474,8 +810,8 @@
       return `${adj} ${noun} #${num}`;
     }
 
-    const sessionId = sessionStorage.getItem('safespace_uid') || ('user-' + Math.random().toString(36).slice(2, 11));
-    sessionStorage.setItem('safespace_uid', sessionId);
+    const sessionId = localStorage.getItem('safespace_uid') || ('user-' + Math.random().toString(36).slice(2, 11));
+    localStorage.setItem('safespace_uid', sessionId);
 
     let myAlias = localStorage.getItem('safespace_alias') || generateAlias();
     localStorage.setItem('safespace_alias', myAlias);
@@ -489,55 +825,184 @@
       aliasDisplay.textContent = myAlias;
     });
 
-    // Tab Navigation
+    // Tab Navigation + Re-sync when returning to Freedom Wall
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         btn.classList.add('active');
         document.getElementById(btn.dataset.target).classList.add('active');
+        if (btn.dataset.target === 'wall-section') {
+          attachPostListeners();
+        }
       });
     });
 
-    // --- FREEDOM WALL LOGIC ---
-    const postsMap = {};
+    // --- REPORTING SYSTEM (COMMENTS & MATCH CHAT) ---
+    const hiddenItems = new Set(JSON.parse(localStorage.getItem('safespace_hidden_items') || '[]'));
+    let pendingReport = null;
+
+    const reportModal = document.getElementById('report-modal');
+    const reportPreview = document.getElementById('report-preview');
+    const reportReason = document.getElementById('report-reason');
+
+    function openReportModal(targetType, targetId, authorAlias, text) {
+      pendingReport = { targetType, targetId, authorAlias, text };
+      reportPreview.textContent = `${authorAlias}: "${text}"`;
+      reportModal.classList.remove('hidden');
+    }
+
+    document.getElementById('cancel-report-btn').addEventListener('click', () => {
+      pendingReport = null;
+      reportModal.classList.add('hidden');
+    });
+
+    document.getElementById('submit-report-btn').addEventListener('click', () => {
+      if (!pendingReport) return;
+      const reportId = 'rep-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+
+      reportsDB.get(reportId).put({
+        targetType: pendingReport.targetType,
+        targetId: pendingReport.targetId,
+        authorAlias: pendingReport.authorAlias,
+        contentSnippet: pendingReport.text.slice(0, 200),
+        reason: reportReason.value,
+        reportedBy: sessionId,
+        createdAt: Date.now()
+      });
+
+      hiddenItems.add(pendingReport.targetId);
+      localStorage.setItem('safespace_hidden_items', JSON.stringify([...hiddenItems]));
+
+      if (pendingReport.targetType === 'chat') {
+        const msgEl = document.querySelector(`[data-msg-id="${pendingReport.targetId}"]`);
+        if (msgEl) {
+          msgEl.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+        }
+      } else {
+        renderPosts();
+      }
+
+      pendingReport = null;
+      reportModal.classList.add('hidden');
+    });
+
+    // --- PERSISTENT FREEDOM WALL LOGIC ---
+    const POSTS_CACHE_KEY = 'safespace_posts_cache_v2';
     const postsFeed = document.getElementById('posts-feed');
     const filterMood = document.getElementById('filter-mood');
+    const filterInterest = document.getElementById('filter-interest');
 
-    // Seed initial welcome post if empty
-    postsMap['welcome-post'] = {
-      id: 'welcome-post',
-      alias: 'Quiet Fox #42',
-      mood: 'Overthinking',
-      content: 'Welcome to SafeSpace. Share what is on your mind without anyone knowing who you are. Toggle comments off if you just want to vent.',
-      allowComments: true,
-      createdAt: 1,
-      timestamp: 'Pinned',
-      comments: {
-        'c1': { alias: 'Midnight Coffee #19', text: 'Glad to have a judgment-free space here.', createdAt: 1 }
+    function loadCachedPosts() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(POSTS_CACHE_KEY) || '{}');
+        if (Object.keys(saved).length > 0) return saved;
+      } catch (e) {}
+      return {
+        'welcome-post': {
+          id: 'welcome-post',
+          alias: 'Quiet Fox #42',
+          mood: 'Overthinking',
+          interest: 'Coffee',
+          content: 'Welcome to SafeSpace. Share what is on your mind without anyone knowing who you are. Your posts stay saved even after closing the site.',
+          allowComments: true,
+          createdAt: 1,
+          timestamp: 'Pinned',
+          comments: {
+            'c1': { id: 'c1', alias: 'Midnight Coffee #19', text: 'Glad to have a judgment-free space here.', createdAt: 1 }
+          }
+        }
+      };
+    }
+
+    const postsMap = loadCachedPosts();
+
+    function savePostsCache() {
+      const cleanCopy = {};
+      for (const [id, post] of Object.entries(postsMap)) {
+        cleanCopy[id] = {
+          id: post.id,
+          alias: post.alias,
+          mood: post.mood,
+          interest: post.interest || 'Coffee',
+          content: post.content,
+          allowComments: post.allowComments,
+          createdAt: post.createdAt,
+          timestamp: post.timestamp,
+          comments: post.comments || {}
+        };
       }
-    };
+      localStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(cleanCopy));
+    }
+
+    function attachCommentListener(postId) {
+      if (!postsMap[postId] || postsMap[postId]._listeningComments || postId === 'welcome-post') return;
+      postsMap[postId]._listeningComments = true;
+      postsDB.get(postId).get('comments').map().on((cData, cId) => {
+        if (!cData || !cData.text) return;
+        postsMap[postId].comments[cId] = { id: cId, ...cData };
+        savePostsCache();
+        renderPosts();
+      });
+    }
+
+    function attachPostListeners() {
+      postsDB.map().on((data, id) => {
+        if (!data || !data.content) return;
+        if (!postsMap[id]) {
+          postsMap[id] = { id, comments: {} };
+        }
+        postsMap[id].alias = data.alias || 'Anonymous';
+        postsMap[id].mood = data.mood || 'Overthinking';
+        postsMap[id].interest = data.interest || 'Coffee';
+        postsMap[id].content = data.content;
+        postsMap[id].allowComments = data.allowComments !== false;
+        postsMap[id].createdAt = data.createdAt || Date.now();
+        postsMap[id].timestamp = data.timestamp || 'Recently';
+
+        attachCommentListener(id);
+        savePostsCache();
+        renderPosts();
+      });
+    }
+
+    // Re-seed cached local posts to connected peers on load
+    Object.values(postsMap).forEach(post => {
+      if (post.id === 'welcome-post') return;
+      postsDB.get(post.id).put({
+        alias: post.alias,
+        mood: post.mood,
+        interest: post.interest || 'Coffee',
+        content: post.content,
+        allowComments: post.allowComments,
+        createdAt: post.createdAt,
+        timestamp: post.timestamp
+      });
+      Object.entries(post.comments || {}).forEach(([cId, c]) => {
+        if (c && c.text) {
+          postsDB.get(post.id).get('comments').get(cId).put({
+            alias: c.alias,
+            text: c.text,
+            createdAt: c.createdAt
+          });
+        }
+      });
+    });
+
     renderPosts();
+    attachPostListeners();
 
-    // Listen for real-time posts
-    postsDB.map().on((data, id) => {
-      if (!data || !data.content) return;
-      if (!postsMap[id]) {
-        postsMap[id] = { id, comments: {} };
-      }
-      postsMap[id].alias = data.alias;
-      postsMap[id].mood = data.mood;
-      postsMap[id].content = data.content;
-      postsMap[id].allowComments = data.allowComments;
-      postsMap[id].createdAt = data.createdAt || Date.now();
-      postsMap[id].timestamp = data.timestamp || 'Recently';
-      renderPosts();
+    window.addEventListener('focus', () => {
+      postsDB.map().once((data) => {
+        if (data && data.content) attachPostListeners();
+      });
     });
 
     // Create a new post
     document.getElementById('submit-post').addEventListener('click', () => {
       const content = document.getElementById('post-content').value.trim();
       const mood = document.getElementById('post-mood').value;
+      const interest = document.getElementById('post-interest').value;
       const allowComments = document.getElementById('allow-comments').checked;
 
       if (!content) return;
@@ -546,38 +1011,57 @@
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-      postsDB.get(postId).put({
+      const newPost = {
+        id: postId,
         alias: myAlias,
         mood,
+        interest,
         content,
         allowComments,
         createdAt: Date.now(),
-        timestamp: timeStr
+        timestamp: timeStr,
+        comments: {}
+      };
+
+      postsMap[postId] = newPost;
+      savePostsCache();
+      renderPosts();
+
+      postsDB.get(postId).put({
+        alias: newPost.alias,
+        mood: newPost.mood,
+        interest: newPost.interest,
+        content: newPost.content,
+        allowComments: newPost.allowComments,
+        createdAt: newPost.createdAt,
+        timestamp: newPost.timestamp
       });
 
       document.getElementById('post-content').value = '';
     });
 
     filterMood.addEventListener('change', renderPosts);
+    filterInterest.addEventListener('change', renderPosts);
 
     function renderPosts() {
       const selectedMood = filterMood.value;
+      const selectedInterest = filterInterest.value;
+
       const sortedPosts = Object.values(postsMap)
-        .filter(p => p.content && (selectedMood === 'ALL' || p.mood === selectedMood))
+        .filter(p => {
+          if (!p || !p.content) return false;
+          const matchesMood = selectedMood === 'ALL' || p.mood === selectedMood;
+          const matchesInterest =
+            selectedInterest === 'ALL' ||
+            (p.interest && p.interest === selectedInterest);
+          return matchesMood && matchesInterest;
+        })
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
       postsFeed.innerHTML = '';
 
       sortedPosts.forEach(post => {
-        // Subscribe to comments for this post once
-        if (!post._listeningComments && post.id !== 'welcome-post') {
-          post._listeningComments = true;
-          postsDB.get(post.id).get('comments').map().on((cData, cId) => {
-            if (!cData || !cData.text) return;
-            post.comments[cId] = cData;
-            renderPosts();
-          });
-        }
+        attachCommentListener(post.id);
 
         const card = document.createElement('div');
         card.className = 'post-card';
@@ -586,12 +1070,17 @@
         if (!post.allowComments) {
           commentsHTML = `<div class="comments-locked">🔒 Comments are disabled by the author (Vent-only mode)</div>`;
         } else {
-          const commentArray = Object.values(post.comments || {})
+          const commentArray = Object.entries(post.comments || {})
+            .map(([cKey, cVal]) => ({ id: cVal.id || cKey, ...cVal }))
+            .filter(c => c.text && !hiddenItems.has(c.id))
             .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-          const list = commentArray.map(c =>
-            `<div class="comment-item"><strong>${escapeHTML(c.alias)}:</strong> ${escapeHTML(c.text)}</div>`
-          ).join('');
+          const list = commentArray.map(c => `
+            <div class="comment-item">
+              <div><strong>${escapeHTML(c.alias)}:</strong> ${escapeHTML(c.text)}</div>
+              <button type="button" class="report-trigger" data-type="comment" data-id="${escapeHTML(c.id)}" data-alias="${escapeHTML(c.alias)}" data-text="${escapeHTML(c.text)}">⚑ Report</button>
+            </div>
+          `).join('');
 
           commentsHTML = `
             <div class="comments-section">
@@ -604,16 +1093,27 @@
           `;
         }
 
+        const interestDisplay = interestLabels[post.interest] || post.interest || 'Iced Coffee';
+
         card.innerHTML = `
           <div class="post-header">
             <span><strong>${escapeHTML(post.alias)}</strong> • ${escapeHTML(post.timestamp)}</span>
-            <span class="badge">#${escapeHTML(post.mood)}</span>
+            <div class="badge-group">
+              <span class="badge">#${escapeHTML(post.mood)}</span>
+              <span class="badge interest">${escapeHTML(interestDisplay)}</span>
+            </div>
           </div>
           <div class="post-body">${escapeHTML(post.content)}</div>
           ${commentsHTML}
         `;
 
         postsFeed.appendChild(card);
+      });
+
+      document.querySelectorAll('.report-trigger').forEach(btn => {
+        btn.addEventListener('click', () => {
+          openReportModal(btn.dataset.type, btn.dataset.id, btn.dataset.alias, btn.dataset.text);
+        });
       });
 
       document.querySelectorAll('.comment-form').forEach(form => {
@@ -624,19 +1124,23 @@
           const postId = form.dataset.id;
           if (!text) return;
 
-          if (postId === 'welcome-post') {
-            postsMap['welcome-post'].comments['c-' + Date.now()] = {
-              alias: myAlias,
-              text,
-              createdAt: Date.now()
-            };
-            renderPosts();
-          } else {
-            const commentId = 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5);
+          const commentId = 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5);
+          const commentObj = {
+            id: commentId,
+            alias: myAlias,
+            text,
+            createdAt: Date.now()
+          };
+
+          postsMap[postId].comments[commentId] = commentObj;
+          savePostsCache();
+          renderPosts();
+
+          if (postId !== 'welcome-post') {
             postsDB.get(postId).get('comments').get(commentId).put({
-              alias: myAlias,
-              text,
-              createdAt: Date.now()
+              alias: commentObj.alias,
+              text: commentObj.text,
+              createdAt: commentObj.createdAt
             });
           }
           input.value = '';
@@ -644,13 +1148,14 @@
       });
     }
 
-    // --- 1-MINUTE EMPATHY MATCH LOGIC ---
+    // --- FIXED 1-MINUTE EMPATHY MATCH LOGIC ---
     let isSearching = false;
     let searchInterval = null;
     let currentRoomId = null;
     let countdownTimer = null;
     let renderedMsgIds = new Set();
     let roomUnlocked = false;
+    let isSimulatedSession = false;
 
     const matchLobby = document.getElementById('match-lobby');
     const chatRoom = document.getElementById('chat-room');
@@ -662,53 +1167,75 @@
 
     document.getElementById('start-match-btn').addEventListener('click', () => {
       const mood = document.getElementById('match-mood').value;
-      startMatchmaking(mood);
+      const interest = document.getElementById('match-interest').value;
+      startMatchmaking(mood, interest);
     });
 
     document.getElementById('cancel-match-btn').addEventListener('click', cancelMatchmaking);
 
-    function startMatchmaking(mood) {
+    document.getElementById('sim-match-btn').addEventListener('click', () => {
+      const mood = document.getElementById('match-mood').value;
+      const interest = document.getElementById('match-interest').value;
+      cancelMatchmaking();
+      startSimulatedRoom(mood, interest);
+    });
+
+    function startMatchmaking(mood, interest) {
       isSearching = true;
+      isSimulatedSession = false;
       document.getElementById('searching-mood').textContent = `#${mood}`;
+      document.getElementById('searching-interest').textContent = interest === 'ANY' ? 'Any Interest' : (interestLabels[interest] || interest);
       searchStatus.classList.remove('hidden');
 
       const moodQueue = lobbyDB.get(mood);
 
-      // Register self in the mood queue
       const updatePresence = () => {
         if (!isSearching) return;
         moodQueue.get(sessionId).put({
           uid: sessionId,
           alias: myAlias,
+          interest: interest,
+          status: 'waiting',
           timestamp: Date.now(),
-          matchedRoom: ''
+          matchedRoom: '',
+          partnerAlias: '',
+          partnerInterest: ''
         });
       };
 
       updatePresence();
-      searchInterval = setInterval(updatePresence, 3000);
+      searchInterval = setInterval(updatePresence, 2500);
 
-      // Listen for incoming match offer or scan waiting peers
-      moodQueue.map().on((peer, peerId) => {
-        if (!isSearching || !peer) return;
-
-        // Check if another user paired with us
-        if (peerId === sessionId && peer.matchedRoom) {
-          enterRoom(peer.matchedRoom, peer.partnerAlias, mood);
-          return;
+      moodQueue.get(sessionId).on((myNode) => {
+        if (!isSearching || !myNode) return;
+        if (myNode.matchedRoom && myNode.status === 'matched') {
+          enterRoom(myNode.matchedRoom, myNode.partnerAlias, mood, myNode.partnerInterest || interest);
         }
+      });
 
-        // Check if another active peer is waiting (within last 12 seconds)
-        const isRecent = peer.timestamp && (Date.now() - peer.timestamp < 12000);
-        if (peerId !== sessionId && isRecent && !peer.matchedRoom) {
-          // Deterministic tie-breaker so both don't create duplicate rooms simultaneously
+      moodQueue.map().on((peer, peerId) => {
+        if (!isSearching || !peer || peerId === sessionId) return;
+        if (peer.status !== 'waiting' || peer.matchedRoom) return;
+
+        const isActive = peer.timestamp && (Math.abs(Date.now() - peer.timestamp) < 60000);
+        const interestCompatible =
+          interest === 'ANY' ||
+          peer.interest === 'ANY' ||
+          peer.interest === interest;
+
+        if (isActive && interestCompatible) {
           if (sessionId < peerId) {
             const roomId = `room-${sessionId}-${peerId}-${Date.now()}`;
+            const sharedInterest = interest === 'ANY' ? (peer.interest || 'Coffee') : interest;
+
             moodQueue.get(peerId).put({
+              status: 'matched',
               matchedRoom: roomId,
-              partnerAlias: myAlias
+              partnerAlias: myAlias,
+              partnerInterest: sharedInterest
             });
-            enterRoom(roomId, peer.alias, mood);
+
+            enterRoom(roomId, peer.alias, mood, sharedInterest);
           }
         }
       });
@@ -719,14 +1246,16 @@
       clearInterval(searchInterval);
       searchStatus.classList.add('hidden');
       const mood = document.getElementById('match-mood').value;
-      lobbyDB.get(mood).get(sessionId).put(null);
+      lobbyDB.get(mood).get(sessionId).put({ status: 'cancelled', matchedRoom: '' });
     }
 
-    function enterRoom(roomId, partnerAlias, mood) {
+    function enterRoom(roomId, partnerAlias, mood, interest) {
       if (currentRoomId) return;
       isSearching = false;
       clearInterval(searchInterval);
-      lobbyDB.get(mood).get(sessionId).put(null);
+
+      const currentMood = document.getElementById('match-mood').value;
+      lobbyDB.get(currentMood).get(sessionId).put({ status: 'in-room', matchedRoom: '' });
 
       currentRoomId = roomId;
       renderedMsgIds.clear();
@@ -741,24 +1270,17 @@
 
       document.getElementById('partner-alias').textContent = partnerAlias || 'Anonymous Peer';
       document.getElementById('chat-mood-badge').textContent = `#${mood}`;
+      document.getElementById('chat-interest-badge').textContent = interest === 'ANY' ? 'Shared Vibe' : (interestLabels[interest] || interest);
       chatMessages.innerHTML = `<div class="msg system">Connected! You both relate to #${mood}. You have 1 minute to talk.</div>`;
 
       const roomNode = roomsDB.get(roomId);
 
-      // Listen for messages in this room
       roomNode.get('messages').map().on((msg, msgId) => {
         if (!msg || !msg.text || renderedMsgIds.has(msgId) || currentRoomId !== roomId) return;
         renderedMsgIds.add(msgId);
-
-        const div = document.createElement('div');
-        const isMine = msg.senderId === sessionId;
-        div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
-        div.innerHTML = isMine ? escapeHTML(msg.text) : `<strong>${escapeHTML(msg.alias)}:</strong> ${escapeHTML(msg.text)}`;
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        renderChatBubble(msgId, msg.senderId === sessionId, msg.alias, msg.text);
       });
 
-      // Listen for room status (leave or mutual consent)
       roomNode.get('status').on((status) => {
         if (!status || currentRoomId !== roomId) return;
         if (status.ended) {
@@ -785,8 +1307,39 @@
         }
       });
 
-      // Start 60-second countdown
+      startRoomTimer();
+    }
+
+    function startSimulatedRoom(mood, interest) {
+      isSimulatedSession = true;
+      currentRoomId = 'sim-' + Date.now();
+      renderedMsgIds.clear();
+      roomUnlocked = false;
+
+      matchLobby.classList.add('hidden');
+      chatRoom.classList.remove('hidden');
+      decisionBox.classList.add('hidden');
+      chatInput.disabled = false;
+      timerDisplay.textContent = '01:00';
+
+      const companionAlias = 'Gentle Lantern #08';
+      document.getElementById('partner-alias').textContent = companionAlias;
+      document.getElementById('chat-mood-badge').textContent = `#${mood}`;
+      document.getElementById('chat-interest-badge').textContent = interest === 'ANY' ? 'Iced Coffee' : (interestLabels[interest] || interest);
+      chatMessages.innerHTML = `<div class="msg system">Connected with ${companionAlias} (#${mood}). Say hello!</div>`;
+
+      setTimeout(() => {
+        if (currentRoomId && isSimulatedSession) {
+          renderChatBubble('sim-m1', false, companionAlias, `Hey! I'm dealing with #${mood} today too. Want to talk about what's on your mind?`);
+        }
+      }, 1200);
+
+      startRoomTimer();
+    }
+
+    function startRoomTimer() {
       let secondsLeft = 60;
+      clearInterval(countdownTimer);
       countdownTimer = setInterval(() => {
         secondsLeft--;
         const mins = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
@@ -802,8 +1355,42 @@
       }, 1000);
     }
 
+    function renderChatBubble(msgId, isMine, alias, text) {
+      const div = document.createElement('div');
+      div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
+      div.dataset.msgId = msgId;
+
+      if (hiddenItems.has(msgId)) {
+        div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+      } else if (isMine) {
+        div.textContent = text;
+      } else {
+        div.innerHTML = `
+          <div class="msg-meta">
+            <strong>${escapeHTML(alias)}</strong>
+            <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
+          </div>
+          <div>${escapeHTML(text)}</div>
+        `;
+        div.querySelector('.chat-report-btn').addEventListener('click', () => {
+          openReportModal('chat', msgId, alias, text);
+        });
+      }
+
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
     document.getElementById('consent-yes').addEventListener('click', () => {
       if (!currentRoomId) return;
+      if (isSimulatedSession) {
+        roomUnlocked = true;
+        decisionBox.classList.add('hidden');
+        chatInput.disabled = false;
+        timerDisplay.textContent = 'Unlocked ∞';
+        appendSystemMessage('Both of you agreed to continue! Private anonymous chat unlocked.');
+        return;
+      }
       roomsDB.get(currentRoomId).get('consents').get(sessionId).put(true);
       document.getElementById('decision-prompt').textContent = 'Waiting for your partner to decide...';
       document.querySelector('.decision-actions').classList.add('hidden');
@@ -811,11 +1398,15 @@
 
     document.getElementById('consent-no').addEventListener('click', () => {
       if (!currentRoomId) return;
+      if (isSimulatedSession) {
+        resetChatUI();
+        return;
+      }
       roomsDB.get(currentRoomId).get('consents').get(sessionId).put(false);
     });
 
     document.getElementById('leave-chat-btn').addEventListener('click', () => {
-      if (currentRoomId) {
+      if (currentRoomId && !isSimulatedSession) {
         roomsDB.get(currentRoomId).get('status').put({
           ended: true,
           reason: 'Your chat partner left the room.'
@@ -826,13 +1417,31 @@
 
     document.getElementById('chat-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!chatInput.value.trim() || !currentRoomId) return;
+      const text = chatInput.value.trim();
+      if (!text || !currentRoomId) return;
 
       const msgId = 'm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+
+      if (isSimulatedSession) {
+        renderChatBubble(msgId, true, myAlias, text);
+        chatInput.value = '';
+        setTimeout(() => {
+          if (!currentRoomId || !isSimulatedSession) return;
+          const replies = [
+            "That makes total sense. Take things one small step at a time.",
+            "I hear you. Sometimes just putting it into words takes half the weight off.",
+            "You're definitely not alone in feeling like that."
+          ];
+          const reply = replies[Math.floor(Math.random() * replies.length)];
+          renderChatBubble('sim-' + Date.now(), false, 'Gentle Lantern #08', reply);
+        }, 1400);
+        return;
+      }
+
       roomsDB.get(currentRoomId).get('messages').get(msgId).put({
         senderId: sessionId,
         alias: myAlias,
-        text: chatInput.value.trim()
+        text
       });
       chatInput.value = '';
     });
@@ -848,6 +1457,7 @@
     function resetChatUI() {
       clearInterval(countdownTimer);
       currentRoomId = null;
+      isSimulatedSession = false;
       chatRoom.classList.add('hidden');
       matchLobby.classList.remove('hidden');
       document.querySelector('.decision-actions').classList.remove('hidden');
@@ -860,6 +1470,144 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
       }[tag]));
     }
+
+    // --- RIGHT-SIDE CORNER AMBIENT PLAYLIST (WEB AUDIO API) ---
+    const tracks = [
+      { name: 'Rainy Café Ambience', freqs: [174.61, 220.00, 261.63, 329.63], type: 'sine', rain: true },
+      { name: 'Midnight Lo-Fi Chords', freqs: [146.83, 174.61, 220.00, 261.63], type: 'triangle', rain: false },
+      { name: 'Warm Hearth Drone', freqs: [130.81, 196.00, 246.94, 293.66], type: 'sine', rain: true }
+    ];
+
+    let currentTrackIdx = 0;
+    let isPlayingMusic = false;
+    let audioCtx = null;
+    let masterGain = null;
+    let activeNodes = [];
+
+    const musicWidget = document.getElementById('music-widget');
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    const trackNow = document.getElementById('track-now');
+    const volumeSlider = document.getElementById('volume-slider');
+
+    document.getElementById('music-toggle-header').addEventListener('click', () => {
+      musicWidget.classList.toggle('collapsed');
+      document.getElementById('music-collapse-icon').textContent =
+        musicWidget.classList.contains('collapsed') ? '▴' : '▾';
+    });
+
+    function stopAudioNodes() {
+      activeNodes.forEach(node => {
+        try { node.stop(); } catch (e) {}
+        try { node.disconnect(); } catch (e) {}
+      });
+      activeNodes = [];
+    }
+
+    function startTrack(index) {
+      currentTrackIdx = (index + tracks.length) % tracks.length;
+      const track = tracks[currentTrackIdx];
+
+      document.querySelectorAll('.playlist-item').forEach((el, idx) => {
+        el.classList.toggle('active', idx === currentTrackIdx);
+      });
+
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = parseFloat(volumeSlider.value) * 0.15;
+        masterGain.connect(audioCtx.destination);
+      }
+
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      stopAudioNodes();
+
+      track.freqs.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const filter = audioCtx.createBiquadFilter();
+        const oscGain = audioCtx.createGain();
+
+        osc.type = track.type;
+        osc.frequency.value = freq;
+        osc.detune.value = (i % 2 === 0 ? 4 : -4);
+
+        filter.type = 'lowpass';
+        filter.frequency.value = 480;
+
+        oscGain.gain.value = 0.22;
+
+        osc.connect(filter);
+        filter.connect(oscGain);
+        oscGain.connect(masterGain);
+        osc.start();
+        activeNodes.push(osc);
+      });
+
+      if (track.rain) {
+        const bufferSize = 2 * audioCtx.sampleRate;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let lastOut = 0.0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          output[i] = (lastOut + (0.02 * white)) / 1.02;
+          lastOut = output[i];
+          output[i] *= 1.8;
+        }
+
+        const whiteNoise = audioCtx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const rainFilter = audioCtx.createBiquadFilter();
+        rainFilter.type = 'bandpass';
+        rainFilter.frequency.value = 700;
+
+        const rainGain = audioCtx.createGain();
+        rainGain.gain.value = 0.18;
+
+        whiteNoise.connect(rainFilter);
+        rainFilter.connect(rainGain);
+        rainGain.connect(masterGain);
+        whiteNoise.start();
+        activeNodes.push(whiteNoise);
+      }
+
+      isPlayingMusic = true;
+      playPauseBtn.textContent = '⏸ Pause';
+      playPauseBtn.classList.add('playing');
+      trackNow.textContent = `Playing — ${track.name}`;
+    }
+
+    function pauseTrack() {
+      stopAudioNodes();
+      isPlayingMusic = false;
+      playPauseBtn.textContent = '▶ Play';
+      playPauseBtn.classList.remove('playing');
+      trackNow.textContent = `Paused — ${tracks[currentTrackIdx].name}`;
+    }
+
+    playPauseBtn.addEventListener('click', () => {
+      if (isPlayingMusic) pauseTrack();
+      else startTrack(currentTrackIdx);
+    });
+
+    document.getElementById('prev-track-btn').addEventListener('click', () => startTrack(currentTrackIdx - 1));
+    document.getElementById('next-track-btn').addEventListener('click', () => startTrack(currentTrackIdx + 1));
+
+    document.querySelectorAll('.playlist-item').forEach(item => {
+      item.addEventListener('click', () => {
+        startTrack(parseInt(item.dataset.index, 10));
+      });
+    });
+
+    volumeSlider.addEventListener('input', (e) => {
+      if (masterGain) {
+        masterGain.gain.value = parseFloat(e.target.value) * 0.15;
+      }
+    });
   </script>
 </body>
 </html>
