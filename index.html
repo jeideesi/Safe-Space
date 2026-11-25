@@ -2453,121 +2453,142 @@
 
       persistAllPostsToArchive();
 
-      // --- ADDED FEATURE: CROSS-DEVICE SHARED POSTS WITHOUT A DATABASE ---
-      const SHARED_JSON_BIN_URL = '';
-      const SHARED_JSON_API_KEY = '';
-      const JSONBLOB_API_BASE = 'https://jsonblob.com/api/jsonBlob';
-      let activeSharedBlobUrl = SHARED_JSON_BIN_URL || '';
-      let isSyncingRemote = false;
+      // --- FIXED SINGLE-ENDPOINT CROSS-DEVICE SYNC (NO DATABASE + #feed= HASH SUPPORT) ---
+      const SHARED_JSON_BIN_URL = 'https://jsonblob.com/api/jsonBlob/PASTE_YOUR_SHARED_ID_HERE';
+      const SHARED_CROSS_DEVICE_URL = SHARED_JSON_BIN_URL;
 
-      function extractPostsArray(payload) {
+      let isSyncingCrossDevice = false;
+
+      function resolveActiveFeedUrl() {
+        try {
+          const hash = window.location.hash || '';
+          const match = hash.match(/feed=([^&]+)/);
+          if (match && match[1]) {
+            const decoded = decodeURIComponent(match[1]);
+            if (decoded.startsWith('https://')) {
+              return decoded;
+            }
+            if (/^[A-Za-z0-9_-]+$/.test(decoded)) {
+              return `https://jsonblob.com/api/jsonBlob/${decoded}`;
+            }
+          }
+        } catch (_) {}
+        return SHARED_CROSS_DEVICE_URL;
+      }
+
+      function extractSharedPosts(payload) {
         if (Array.isArray(payload)) return payload;
         if (payload && Array.isArray(payload.posts)) return payload.posts;
         if (payload && Array.isArray(payload.record)) return payload.record;
         return [];
       }
 
-      async function ensureSharedBlobUrl() {
-        if (activeSharedBlobUrl) return activeSharedBlobUrl;
+      function hasValidSharedUrl(url) {
+        return (
+          typeof url === 'string' &&
+          url.startsWith('https://') &&
+          !url.includes('PASTE_YOUR_SHARED_ID_HERE')
+        );
+      }
 
-        const savedUrl = localStorage.getItem('safespace_shared_blob_url');
-        if (savedUrl) {
-          activeSharedBlobUrl = savedUrl;
-          return activeSharedBlobUrl;
-        }
-
+      function ensureFeedHashInUrl(url) {
+        if (!hasValidSharedUrl(url)) return;
         try {
-          const initialPosts = Object.values(postsMap)
+          const currentHash = window.location.hash || '';
+          const expectedFragment = `#feed=${encodeURIComponent(url)}`;
+          if (!currentHash.includes('feed=')) {
+            window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${expectedFragment}`);
+          }
+        } catch (_) {}
+      }
+
+      async function pullSharedPosts() {
+        const targetUrl = resolveActiveFeedUrl();
+        if (!hasValidSharedUrl(targetUrl) || isSyncingCrossDevice) return;
+        ensureFeedHashInUrl(targetUrl);
+        isSyncingCrossDevice = true;
+        try {
+          const sep = targetUrl.includes('?') ? '&' : '?';
+          const res = await fetch(`${targetUrl}${sep}_t=${Date.now()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          const remotePosts = extractSharedPosts(data);
+          if (remotePosts.length > 0) {
+            hydratePosts(remotePosts);
+            persistAllPostsToArchive();
+          }
+        } catch (err) {
+          console.warn('Cross-device pull failed:', err);
+        } finally {
+          isSyncingCrossDevice = false;
+        }
+      }
+
+      async function pushSharedPosts() {
+        const targetUrl = resolveActiveFeedUrl();
+        if (!hasValidSharedUrl(targetUrl) || isSyncingCrossDevice) return;
+        ensureFeedHashInUrl(targetUrl);
+        isSyncingCrossDevice = true;
+        try {
+          // Pull latest first so we do not overwrite posts made on another device
+          const sep = targetUrl.includes('?') ? '&' : '?';
+          const getRes = await fetch(`${targetUrl}${sep}_t=${Date.now()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+          });
+          if (getRes.ok) {
+            const latestRemote = extractSharedPosts(await getRes.json());
+            if (latestRemote.length > 0) {
+              hydratePosts(latestRemote);
+            }
+          }
+
+          const mergedPosts = Object.values(postsMap)
             .filter(p => p && p.id && p.content)
             .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
             .slice(0, 100);
 
-          const res = await fetch(JSONBLOB_API_BASE, {
-            method: 'POST',
+          const putRes = await fetch(targetUrl, {
+            method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
-            body: JSON.stringify(initialPosts)
+            body: JSON.stringify(mergedPosts)
           });
 
-          const locationHeader = res.headers.get('Location');
-          let createdUrl = locationHeader || '';
-
-          if (!createdUrl) {
-            const data = await res.json().catch(() => null);
-            if (data && data.id) {
-              createdUrl = `${JSONBLOB_API_BASE}/${data.id}`;
-            }
+          if (putRes.ok) {
+            persistAllPostsToArchive();
+          } else {
+            showToast('Could not sync post to shared feed.');
           }
-
-          if (createdUrl) {
-            if (createdUrl.startsWith('http://')) {
-              createdUrl = createdUrl.replace('http://', 'https://');
-            }
-            activeSharedBlobUrl = createdUrl;
-            localStorage.setItem('safespace_shared_blob_url', createdUrl);
-            console.log('SafeSpace Shared Feed URL:', createdUrl);
-          }
-        } catch (_) {}
-
-        return activeSharedBlobUrl;
-      }
-
-      async function syncPostsAcrossDevices(pushLocalChanges = false) {
-        if (isSyncingRemote) return;
-        isSyncingRemote = true;
-
-        try {
-          const blobUrl = await ensureSharedBlobUrl();
-          if (!blobUrl) return;
-
-          const headers = { 'Accept': 'application/json' };
-          if (SHARED_JSON_API_KEY) headers['X-Master-Key'] = SHARED_JSON_API_KEY;
-
-          const getRes = await fetch(blobUrl, { headers, cache: 'no-store' });
-          if (getRes.ok) {
-            const remoteData = await getRes.json();
-            const remotePosts = extractPostsArray(remoteData);
-            if (remotePosts.length > 0) {
-              hydratePosts(remotePosts);
-              persistAllPostsToArchive();
-            }
-          }
-
-          if (pushLocalChanges) {
-            const mergedList = Object.values(postsMap)
-              .filter(p => p && p.id && p.content)
-              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-              .slice(0, 100);
-
-            const putHeaders = {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            };
-            if (SHARED_JSON_API_KEY) putHeaders['X-Master-Key'] = SHARED_JSON_API_KEY;
-
-            await fetch(blobUrl, {
-              method: 'PUT',
-              headers: putHeaders,
-              body: JSON.stringify(mergedList)
-            });
-          }
-        } catch (_) {} finally {
-          isSyncingRemote = false;
+        } catch (err) {
+          console.warn('Cross-device push failed:', err);
+          showToast('Network error while syncing post across devices.');
+        } finally {
+          isSyncingCrossDevice = false;
         }
       }
 
       document.getElementById('submit-post').addEventListener('click', () => {
-        setTimeout(() => syncPostsAcrossDevices(true), 200);
+        setTimeout(pushSharedPosts, 250);
       });
 
       postsFeed.addEventListener('submit', () => {
-        setTimeout(() => syncPostsAcrossDevices(true), 200);
+        setTimeout(pushSharedPosts, 250);
       });
 
-      syncPostsAcrossDevices(false);
-      setInterval(() => syncPostsAcrossDevices(false), 5000);
+      window.addEventListener('hashchange', () => {
+        pullSharedPosts();
+      });
+
+      pullSharedPosts();
+      setInterval(pullSharedPosts, 5000);
     });
   </script>
 </body>
