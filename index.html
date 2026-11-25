@@ -583,6 +583,58 @@
       flex-wrap: wrap;
     }
 
+    .ai-teach-panel {
+      margin-top: 0.85rem;
+      padding-top: 0.85rem;
+      border-top: 1px dashed var(--border);
+    }
+
+    .ai-teach-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .ai-teach-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .ai-teach-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.65rem;
+      background: var(--bg);
+      padding: 0.8rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .ai-teach-form input {
+      margin-top: 0;
+      font-size: 0.84rem;
+      padding: 0.55rem 0.75rem;
+    }
+
+    .ai-teach-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .ai-dataset-badge {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
     .chat-input-area {
       display: flex;
       gap: 0.5rem;
@@ -808,7 +860,7 @@
 
   <nav class="tabs" aria-label="Main Sections">
     <button type="button" class="tab-btn active" data-target="wall-section">Freedom Wall</button>
-    <button type="button" class="tab-btn" data-target="match-section">1-Minute Empathy Match</button>
+    <button type="button" class="tab-btn" data-target="match-section">Need someone to talk to? We're here.</button>
   </nav>
 
   <main>
@@ -878,11 +930,11 @@
       <div id="posts-feed" class="feed"></div>
     </section>
 
-    <!-- 1-MINUTE EMPATHY MATCH SECTION -->
+    <!-- NEED SOMEONE TO TALK TO? WE'RE HERE. SECTION -->
     <section id="match-section" class="view">
       <div id="match-lobby" class="match-card">
-        <h2>Find Someone Who Relates</h2>
-        <p>Select your current experience and a shared interest. We will connect you anonymously for a 1-minute empathy chat.</p>
+        <h2>Need someone to talk to? We're here.</h2>
+        <p>Pick your current mood and interest to start chatting right away with our SimSimi-style conversational AI—powered by NLP and a crowd-taught Q&amp;A brain you can teach anytime.</p>
 
         <div class="match-selectors">
           <div class="field-box">
@@ -912,11 +964,11 @@
           </div>
         </div>
 
-        <button id="start-match-btn" type="button" class="primary-btn">Find a Match</button>
+        <button id="start-match-btn" type="button" class="primary-btn">Start Talking</button>
 
         <div id="search-status" class="status-text hidden">
           <p>
-            Looking for someone experiencing <strong id="searching-mood"></strong>
+            Waking up your chat buddy for <strong id="searching-mood"></strong>
             (<span id="searching-interest"></span>)...
             <button id="cancel-match-btn" type="button" class="link-btn">Cancel</button>
           </p>
@@ -926,7 +978,7 @@
       <div id="chat-room" class="chat-card hidden">
         <div class="chat-header">
           <div class="chat-partner-info">
-            <span>Chatting with <strong id="partner-alias"></strong></span>
+            <span>Talking with <strong id="partner-alias"></strong></span>
             <span class="badge" id="chat-mood-badge"></span>
             <span class="badge interest" id="chat-interest-badge"></span>
           </div>
@@ -937,25 +989,37 @@
         <div id="chat-messages" class="chat-messages"></div>
 
         <div id="decision-box" class="decision-box hidden">
-          <p id="decision-prompt">Time is up! Would you like to continue chatting anonymously?</p>
+          <p id="decision-prompt">Time is up! Would you like to keep talking?</p>
           <div id="decision-actions" class="decision-actions">
-            <button id="consent-yes" type="button" class="primary-btn">Yes, continue</button>
+            <button id="consent-yes" type="button" class="primary-btn">Yes, keep chatting</button>
             <button id="consent-no" type="button" class="danger-btn">No, end chat</button>
           </div>
         </div>
 
         <form id="chat-form" class="chat-input-area">
-          <input type="text" id="chat-input" placeholder="Send a kind, anonymous message..." autocomplete="off" />
+          <input type="text" id="chat-input" placeholder="Say anything... vent, joke around, or ask a question!" autocomplete="off" />
           <button type="submit" id="chat-send-btn" class="primary-btn">Send</button>
         </form>
+
+        <div class="ai-teach-panel">
+          <div class="ai-teach-row">
+            <button type="button" id="toggle-teach-ai-btn" class="ai-teach-toggle">+ Teach Simi-SafeSpace a Reply</button>
+            <span id="ai-dataset-count" class="ai-dataset-badge">Crowd Brain: 0 Q&amp;A pairs learned</span>
+          </div>
+          <form id="teach-ai-form" class="ai-teach-form hidden">
+            <input type="text" id="teach-question-input" placeholder="If someone says (e.g., pagod na ako / i feel stressed)..." required />
+            <input type="text" id="teach-answer-input" placeholder="What should the AI reply back?..." required />
+            <button type="submit" class="secondary-btn">Teach Reply to Dataset</button>
+          </form>
+        </div>
       </div>
     </section>
   </main>
 
   <!-- REPORT MODAL -->
-  <div id="report-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+  <div id="report-modal" class="modal-backdrop hidden">
     <div class="modal-card">
-      <h4 id="report-modal-title">Report Content</h4>
+      <h4>Report Content</h4>
       <p style="font-size: 0.84rem; color: var(--muted);">Flagged content will be hidden from your view and logged for moderation.</p>
       <div id="report-preview" class="modal-quote"></div>
       <label for="report-reason" style="font-size: 0.82rem; color: var(--muted);">Reason:</label>
@@ -973,7 +1037,7 @@
   </div>
 
   <!-- RIGHT-SIDE CORNER AMBIENT PLAYLIST WIDGET -->
-  <aside id="music-widget" class="music-widget" aria-label="Ambient Radio Player">
+  <aside id="music-widget" class="music-widget" aria-label="Ambient Music Player">
     <div id="music-toggle-header" class="music-header">
       <span>🎵 SafeSpace Chill Radio</span>
       <span id="music-collapse-icon">▾</span>
@@ -981,9 +1045,9 @@
     <div class="music-body">
       <div id="track-now" class="track-now">Paused — Rainy Café Ambience</div>
       <div class="music-controls">
-        <button id="prev-track-btn" type="button" title="Previous Track" aria-label="Previous Track">⏮</button>
-        <button id="play-pause-btn" type="button" title="Play or Pause">▶ Play</button>
-        <button id="next-track-btn" type="button" title="Next Track" aria-label="Next Track">⏭</button>
+        <button id="prev-track-btn" type="button" title="Previous track" aria-label="Previous track">⏮</button>
+        <button id="play-pause-btn" type="button" title="Play or Pause" aria-label="Play or Pause">▶ Play</button>
+        <button id="next-track-btn" type="button" title="Next track" aria-label="Next track">⏭</button>
         <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.35" title="Volume" aria-label="Volume" />
       </div>
       <ul id="playlist-list" class="playlist-list">
@@ -996,7 +1060,7 @@
 
   <script>
     window.addEventListener('DOMContentLoaded', () => {
-      // Backend URL configuration (optional real-time server; never blocks local experience)
+      // --- CONFIGURATION & CONSTANTS ---
       const BACKEND_BASE_URL =
         window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:3001'
@@ -1058,7 +1122,6 @@
         }
       ];
 
-      // --- SESSION ALIAS MANAGEMENT ---
       const adjectives = ['Quiet', 'Midnight', 'Gentle', 'Wandering', 'Hidden', 'Calm', 'Silver', 'Warm'];
       const nouns = ['Fox', 'Coffee', 'Cloud', 'Lantern', 'River', 'Star', 'Echo', 'Breeze'];
 
@@ -1069,6 +1132,27 @@
         return `${adj} ${noun} #${num}`;
       }
 
+      // --- TOAST HELPER (REPLACES BLOCKING ALERT DIALOGS) ---
+      const statusToast = document.getElementById('status-toast');
+      const statusToastText = document.getElementById('status-toast-text');
+      let toastTimer = null;
+
+      function showToast(message) {
+        if (!message) return;
+        statusToastText.textContent = message;
+        statusToast.classList.remove('hidden');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          statusToast.classList.add('hidden');
+        }, 4500);
+      }
+
+      document.getElementById('status-toast-close').addEventListener('click', () => {
+        clearTimeout(toastTimer);
+        statusToast.classList.add('hidden');
+      });
+
+      // --- SESSION IDENTITY ---
       let myAlias = sessionStorage.getItem('safespace_tab_alias') || generateAlias();
       sessionStorage.setItem('safespace_tab_alias', myAlias);
 
@@ -1076,26 +1160,6 @@
       const syncDot = document.getElementById('sync-dot');
       const syncLabel = document.getElementById('sync-label');
       aliasDisplay.textContent = myAlias;
-
-      // --- NON-BLOCKING TOAST HELPER (Replaces alert()) ---
-      const statusToast = document.getElementById('status-toast');
-      const statusToastText = document.getElementById('status-toast-text');
-      let toastTimeout = null;
-
-      function showToast(message) {
-        if (!message) return;
-        clearTimeout(toastTimeout);
-        statusToastText.textContent = message;
-        statusToast.classList.remove('hidden');
-        toastTimeout = setTimeout(() => {
-          statusToast.classList.add('hidden');
-        }, 5000);
-      }
-
-      document.getElementById('status-toast-close').addEventListener('click', () => {
-        clearTimeout(toastTimeout);
-        statusToast.classList.add('hidden');
-      });
 
       // --- POSTS STATE & DEDUPLICATION ---
       const postsMap = {};
@@ -1106,7 +1170,6 @@
       let isLocalMatchSession = false;
       let isSearchingMatch = false;
 
-      // Initialize feed & filter DOM references before hydratePosts() calls renderPosts()
       const postsFeed = document.getElementById('posts-feed');
       const filterMood = document.getElementById('filter-mood');
       const filterInterest = document.getElementById('filter-interest');
@@ -1166,7 +1229,6 @@
       function hydratePosts(list) {
         const valid = Array.isArray(list) ? list.filter(p => p && p.id && p.content) : [];
         valid.forEach(post => {
-          // Deduplicate against optimistic client post if server assigned a new ID for identical content
           const matchingOptimisticKey = Object.keys(postsMap).find(existingId => {
             const p = postsMap[existingId];
             return (
@@ -1292,7 +1354,6 @@
       });
 
       // --- FREEDOM WALL POSTING & COMMENTS ---
-      // Clean Restore Posts: resets filters, clears hidden items, restores all starter posts cleanly
       document.getElementById('restore-posts-btn').addEventListener('click', () => {
         filterMood.value = 'ALL';
         filterInterest.value = 'ALL';
@@ -1473,13 +1534,15 @@
         });
       }
 
-      // --- 1-MINUTE EMPATHY MATCH LOGIC ---
+      // --- SIMSIMI-STYLE RETRIEVAL CONVERSATIONAL AI (NLP + CROWD-TAUGHT Q&A DATASET) ---
       let currentRoomId = null;
       let countdownInterval = null;
       let roomUnlocked = false;
       let activeMatchMood = 'Overthinking';
-      let activePeerAlias = 'Gentle Echo #44';
-      let localBotTurn = 0;
+      let activeMatchInterest = 'ANY';
+      let activePeerAlias = 'Simi • SafeSpace AI';
+      let lastUserUtterance = '';
+      const usedAnswerIndices = new Set();
       const renderedMsgIds = new Set();
 
       const matchLobby = document.getElementById('match-lobby');
@@ -1492,46 +1555,251 @@
       const decisionPrompt = document.getElementById('decision-prompt');
       const chatInput = document.getElementById('chat-input');
       const chatSendBtn = document.getElementById('chat-send-btn');
+      const aiDatasetCountEl = document.getElementById('ai-dataset-count');
+      const teachAiForm = document.getElementById('teach-ai-form');
 
-      const empathyRepliesByMood = {
-        Overthinking: [
-          "I totally get that spiral—when my mind won't slow down, writing out just one tiny next step helps.",
-          "You don't have to figure out every possible outcome tonight. What's the main thing weighing on you right now?",
-          "It makes complete sense that you're mentally drained from replaying everything. Take a slow breath—I'm listening."
-        ],
-        Burnout: [
-          "Running on empty for so long catches up fast. Have you had a real break away from obligations today?",
-          "Rest isn't laziness—your brain is genuinely signaling that it needs recovery time.",
-          "I hear how exhausted you are. Even stepping back for ten quiet minutes counts."
-        ],
-        AcademicPressure: [
-          "Deadlines and expectations can make it feel like one grade defines everything, even when it doesn't.",
-          "Breaking a huge assignment into one 15-minute chunk is honestly the only way I survive weeks like that.",
-          "You're carrying a lot right now—be gentle with yourself while you work through it."
-        ],
-        Heartbreak: [
-          "Heartache sits so heavy in the chest. It's okay if you're not ready to 'look on the bright side' yet.",
-          "Missing someone or grieving what changed takes real time. I'm glad you didn't keep it bottled up alone.",
-          "Take things hour by hour tonight. Your feelings are completely valid."
-        ],
-        Lonely: [
-          "Feeling disconnected even when people are around is a really tough feeling. I'm glad we matched for this minute.",
-          "Sometimes just knowing someone out there is genuinely reading your words makes the room feel a little warmer.",
-          "I'm right here with you—tell me about your day or whatever is on your mind."
-        ],
-        Grateful: [
-          "It's really uplifting to hear something bright today! What little moment sparked that for you?",
-          "Holding onto those small wins makes such a difference during busy weeks.",
-          "Thanks for sharing that positive energy—it genuinely made me smile."
-        ]
-      };
+      const USER_TAUGHT_QA_KEY = 'safespace_nlp_user_taught_qa_v1';
 
-      function getNextLocalPeerReply(mood) {
-        const pool = empathyRepliesByMood[mood] || empathyRepliesByMood.Overthinking;
-        const reply = pool[localBotTurn % pool.length];
-        localBotTurn += 1;
-        return reply;
+      const baseQaDataset = [
+        // Casual Greetings & SimSimi-Style Banter
+        { q: "hi hello hey yo sup kamusta musta", a: "Hiii!! 🐣 So glad you dropped by! Spill the tea or tell me how your day's going—I'm all ears!", mood: "ALL" },
+        { q: "good morning morning", a: "Good morning!! ☀️ Did you get enough sleep or are we running on iced coffee and hope today?", mood: "ALL" },
+        { q: "good evening good night", a: "Good evening! 🌙 Winding down or about to overthink everything until 2 AM? Either way, I'm here with you!", mood: "ALL" },
+        { q: "how are you how r u kamusta ka", a: "Living my best digital life waiting to chat with you! 😄 More importantly, how are *you* really doing today?", mood: "ALL" },
+        { q: "who are you what is your name are you a bot simsimi ai", a: "I'm Simi on SafeSpace! 🐥 Think of me like your pocket chat buddy—powered by NLP and a massive crowd-taught Q&A brain. You can even teach me new replies below!", mood: "ALL" },
+        { q: "are you real human or robot", a: "100% virtual buddy, 100% real listening energy! No judgment, no screenshots, just vibes and support.", mood: "ALL" },
+        { q: "im bored bored nothing to do", a: "Boredom unlocked! 😆 Want to vent about something random, tell me a hot take, or rate your week from 1 to 10?", mood: "ALL" },
+        { q: "tell me a joke make me laugh funny", a: "Why did the programmer quit their job? Because they didn't get arrays! 😂 Okay okay, your turn—what's been making you smile lately?", mood: "ALL" },
+        { q: "i love you love u", a: "Aww stop it, you're making my code blush!! 💛 Sending huge virtual hugs right back to you!", mood: "ALL" },
+        { q: "haha lol lmao hahahahaha", a: "Hahaha I love seeing that energy!! 😂 What's got you laughing?", mood: "ALL" },
+        { q: "ok okay k sige", a: "Short and mysterious 👀 I see you! What else is floating around in your head right now?", mood: "ALL" },
+        { q: "thank you thanks salamat ty", a: "Anytime, bestie!! 🐥 You never have to carry heavy stuff all by yourself. Need to talk more?", mood: "ALL" },
+        { q: "bye goodbye see you later", a: "Take super good care of yourself out there! 💛 Come back whenever you need someone to talk to!", mood: "ALL" },
+
+        // Taglish / Filipino Casual Expressions
+        { q: "pagod na ako pagod super tired", a: "Huy, pahinga ka muna kahit saglit! 🥺 You've been working so hard—what's been draining you the most lately?", mood: "Burnout" },
+        { q: "ewan ko hindi ko alam di ko alam", a: "Valid!! Minsan talaga magulo lang yung utak natin at hindi kailangan ng sagot agad. Kwento mo lang kung anong nararamdaman mo.", mood: "Overthinking" },
+        { q: "ang hirap ang sakit sobra", a: "Yakap nang mahigpit!! 🫂 Hindi madali yung pinagdadaanan mo ngayon, pero nandito lang ako para makinig.", mood: "Heartbreak" },
+        { q: "walang makausap mag isa", a: "Nandito na ako!! 🐥 Hindi ka nag-iisa ngayon—chika mo lang kahit ano, walang judgment dito.", mood: "Lonely" },
+
+        // Need Someone to Talk To & Openers
+        { q: "i need someone to talk to can we talk", a: "Need someone to talk to? We're right here! 💛 No filters needed—just type whatever's on your mind.", mood: "ALL" },
+        { q: "i dont know what to say or where to start", a: "No pressure at all! Start with one word or tell me what you ate today—we'll take it from there 😊", mood: "ALL" },
+        { q: "can i vent rant to you", a: "Vent away!! Caps lock, messy thoughts, long paragraphs—drop it all here, I'm listening.", mood: "ALL" },
+
+        // Overthinking & Anxiety
+        { q: "i cant stop overthinking everything at night", a: "Ugh, 2 AM overthinking hits like a truck! 🧠 Pause for a second—is this something you can fix tonight, or is your brain just replaying reruns?", mood: "Overthinking" },
+        { q: "what if i fail or make the wrong choice", a: "What if it actually turns out way better than your brain is predicting? Even wrong turns teach us something—you only need the next tiny step.", mood: "Overthinking" },
+        { q: "my brain wont shut off racing thoughts anxious", a: "Deep breath in... and slow breath out! 🌬️ Name just one thing you can see or hold right now to ground yourself, then tell me what's looping.", mood: "Overthinking" },
+        { q: "i keep replaying an awkward moment or mistake", a: "Promise you: everyone else already forgot about it and is busy worrying about their own awkward moments! Be gentle with yourself today.", mood: "Overthinking" },
+
+        // Burnout & Exhaustion
+        { q: "im so burned out exhausted tired of everything", a: "Sounds like your battery is at 1%! 🪫 Rest isn't something you have to earn—when was the last time you did absolutely nothing guilt-free?", mood: "Burnout" },
+        { q: "i have zero motivation to work or study anymore", a: "Zero motivation usually means your brain is overloaded, not lazy! Try doing just 5 tiny minutes, or take a real breather first.", mood: "Burnout" },
+        { q: "too many responsibilities and no break", a: "You're juggling way too many plates right now! If you could drop just ONE thing today without consequences, what would it be?", mood: "Burnout" },
+
+        // Academic Pressure
+        { q: "stressed about exams grades failing school university", a: "Grades measure one test on one day—they don't measure your intelligence or your future! 📚 Which subject is giving you the biggest headache?", mood: "AcademicPressure" },
+        { q: "so many deadlines assignments due tomorrow i cant finish", a: "Deadline panic mode activated! 🚨 Forget the whole mountain—pick the easiest 10-minute piece first just to get moving!", mood: "AcademicPressure" },
+        { q: "afraid of disappointing my parents or family", a: "Carrying family expectations on top of school stress is so heavy. Your mental health matters way more than perfection.", mood: "AcademicPressure" },
+
+        // Heartbreak & Relationships
+        { q: "going through a breakup heartbreak miss my ex", a: "Heartbreak hurts in a way nobody prepares you for 💔 Missing someone while knowing things changed is totally normal—take it one hour at a time.", mood: "Heartbreak" },
+        { q: "why does letting go hurt so much", a: "Because your feelings were real! Healing isn't a straight line—some days you'll feel okay, and some days it hits again. And that's okay.", mood: "Heartbreak" },
+        { q: "feel ghosted betrayed by someone i trusted", a: "Being left without closure says everything about their communication and nothing about your worth. Glad you're talking it out instead of holding it in!", mood: "Heartbreak" },
+
+        // Loneliness & Isolation
+        { q: "i feel so lonely even around other people", a: "Feeling lonely in a crowded room is the heaviest kind of quiet. I'm genuinely glad you opened up here—you're seen right now. 💛", mood: "Lonely" },
+        { q: "nobody understands what im going through", a: "It's exhausting wearing an 'I'm fine' mask all day. You can take the mask off here—tell me what's really going on.", mood: "Lonely" },
+
+        // Gratitude & Positivity
+        { q: "i feel grateful today something good happened", a: "YESSS!! 🎉 Tell me everything—what good thing happened today?!", mood: "Grateful" },
+        { q: "small win proud of myself today", a: "Big cheers for small wins!! 🥳 You deserve to celebrate every step forward!", mood: "Grateful" },
+
+        // Shared Interests
+        { q: "iced coffee cafe drink late night", a: "Iced coffee solves 80% of life's problems (scientifically unproven, emotionally true) ☕ What's your go-to order?", mood: "ALL" },
+        { q: "coding programming debugging tech computer", a: "Nothing humbles a human faster than a missing semicolon 💻 What are you building or debugging right now?", mood: "ALL" },
+        { q: "gaming video games relaxing", a: "Gaming is the ultimate escape hatch when real life gets noisy 🎮 What have you been playing lately?", mood: "ALL" },
+        { q: "music songs playlist listening", a: "Drop your current repeat song!! 🎧 Music hits different when you're in your feels.", mood: "ALL" },
+        { q: "pets dog cat animals comfort", a: "Pets are literal therapists with fur 🐾 Do you have a dog, cat, or another cute buddy at home?", mood: "ALL" }
+      ];
+
+      function loadUserTaughtQa() {
+        try {
+          const raw = localStorage.getItem(USER_TAUGHT_QA_KEY);
+          const parsed = raw ? JSON.parse(raw) : [];
+          return Array.isArray(parsed) ? parsed.filter(item => item && item.q && item.a) : [];
+        } catch (_) {
+          return [];
+        }
       }
+
+      let userTaughtQa = loadUserTaughtQa();
+
+      function getCombinedQaDataset() {
+        return [...userTaughtQa, ...baseQaDataset];
+      }
+
+      function updateDatasetCountBadge() {
+        if (aiDatasetCountEl) {
+          const total = getCombinedQaDataset().length;
+          aiDatasetCountEl.textContent = `Crowd Brain: ${total} Q&A pairs (${userTaughtQa.length} taught by you)`;
+        }
+      }
+
+      updateDatasetCountBadge();
+
+      // NLP Preprocessing: Normalization, Stopword Removal, Lightweight Stemming & Bigrams
+      const nlpStopwords = new Set([
+        'a', 'an', 'the', 'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
+        'to', 'of', 'in', 'on', 'at', 'for', 'with', 'about', 'into', 'through',
+        'it', 'its', 'this', 'that', 'these', 'those', 'and', 'or', 'but', 'if',
+        'just', 'very', 'really', 'so', 'too', 'as', 'by', 'from'
+      ]);
+
+      function stemToken(token) {
+        if (token.length <= 3) return token;
+        if (token.endsWith('ing') && token.length > 5) return token.slice(0, -3);
+        if (token.endsWith('ed') && token.length > 4) return token.slice(0, -2);
+        if (token.endsWith('es') && token.length > 4) return token.slice(0, -2);
+        if (token.endsWith('s') && !token.endsWith('ss') && token.length > 3) return token.slice(0, -1);
+        return token;
+      }
+
+      function extractNlpFeatures(text) {
+        const cleaned = String(text || '')
+          .toLowerCase()
+          .replace(/[^a-z0-9\s']/g, ' ')
+          .replace(/'/g, '')
+          .trim();
+
+        const rawTokens = cleaned.split(/\s+/).filter(Boolean);
+        const unigrams = rawTokens
+          .filter(t => !nlpStopwords.has(t) || rawTokens.length <= 2)
+          .map(stemToken)
+          .filter(Boolean);
+
+        const features = [...unigrams];
+        for (let i = 0; i < unigrams.length - 1; i++) {
+          features.push(`${unigrams[i]}_${unigrams[i + 1]}`);
+        }
+        return features;
+      }
+
+      // TF-IDF Cosine Similarity Retrieval Engine
+      function retrieveConversationalResponse(userQuery, mood, interest) {
+        const dataset = getCombinedQaDataset();
+        const queryTokens = extractNlpFeatures(userQuery);
+
+        const docFreq = new Map();
+        const docTokenLists = dataset.map(entry => {
+          const tokens = extractNlpFeatures(`${entry.q} ${entry.mood !== 'ALL' ? entry.mood : ''}`);
+          const unique = new Set(tokens);
+          unique.forEach(tok => docFreq.set(tok, (docFreq.get(tok) || 0) + 1));
+          return tokens;
+        });
+
+        const N = dataset.length || 1;
+        const idf = (term) => Math.log((N + 1) / ((docFreq.get(term) || 0) + 1)) + 1;
+
+        const buildTfIdfVector = (tokens) => {
+          const tf = new Map();
+          tokens.forEach(t => tf.set(t, (tf.get(t) || 0) + 1));
+          const vec = new Map();
+          let normSq = 0;
+          tf.forEach((count, term) => {
+            const weight = (1 + Math.log(count)) * idf(term);
+            vec.set(term, weight);
+            normSq += weight * weight;
+          });
+          return { vec, norm: Math.sqrt(normSq) || 1 };
+        };
+
+        const queryVecObj = buildTfIdfVector(queryTokens);
+
+        let bestIdx = -1;
+        let bestScore = -1;
+
+        dataset.forEach((entry, idx) => {
+          const docVecObj = buildTfIdfVector(docTokenLists[idx]);
+          let dot = 0;
+          queryVecObj.vec.forEach((qWeight, term) => {
+            if (docVecObj.vec.has(term)) {
+              dot += qWeight * docVecObj.vec.get(term);
+            }
+          });
+
+          let similarity = dot / (queryVecObj.norm * docVecObj.norm);
+
+          if (entry.mood && entry.mood === mood) {
+            similarity += 0.14;
+          }
+          if (interest && interest !== 'ANY' && entry.q.toLowerCase().includes(interest.toLowerCase())) {
+            similarity += 0.1;
+          }
+          if (idx < userTaughtQa.length && similarity > 0.15) {
+            similarity += 0.08;
+          }
+          if (usedAnswerIndices.has(idx)) {
+            similarity -= 0.35;
+          }
+
+          if (similarity > bestScore) {
+            bestScore = similarity;
+            bestIdx = idx;
+          }
+        });
+
+        if (bestIdx >= 0 && bestScore > 0.08) {
+          usedAnswerIndices.add(bestIdx);
+          return dataset[bestIdx].a;
+        }
+
+        const moodFallbacks = {
+          Overthinking: "Ooh, sounds like your brain is running a marathon right now! 🧠 Tell me more—and if you want, click '+ Teach Simi-SafeSpace a Reply' below so I know the exact vibe next time!",
+          Burnout: "I feel that exhaustion through the screen 🪫 You've been carrying a lot—what's been taking the most out of you lately?",
+          AcademicPressure: "School stress is no joke 📚 Vent to me! Which deadline or class is stressing you out the most?",
+          Heartbreak: "Oof, that hits right in the feels 💔 I'm listening—tell me what happened if you feel up to sharing.",
+          Lonely: "I'm right here with you, bestie 💛 Keep talking—what's on your mind right now?",
+          Grateful: "Love that energy!! ✨ Tell me more about what's making today feel good!"
+        };
+        return moodFallbacks[mood] || "Oooh tell me more about that! 👀 I'm listening—what happened next?";
+      }
+
+      // Interactive UI to teach new Q&A pairs to the NLP retrieval dataset
+      document.getElementById('toggle-teach-ai-btn').addEventListener('click', () => {
+        teachAiForm.classList.toggle('hidden');
+        const qInput = document.getElementById('teach-question-input');
+        if (!teachAiForm.classList.contains('hidden') && lastUserUtterance && !qInput.value) {
+          qInput.value = lastUserUtterance;
+        }
+      });
+
+      teachAiForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const qInput = document.getElementById('teach-question-input');
+        const aInput = document.getElementById('teach-answer-input');
+        const q = qInput.value.trim();
+        const a = aInput.value.trim();
+        if (!q || !a) return;
+
+        userTaughtQa.unshift({
+          q,
+          a,
+          mood: activeMatchMood || 'ALL',
+          createdAt: Date.now()
+        });
+
+        try {
+          localStorage.setItem(USER_TAUGHT_QA_KEY, JSON.stringify(userTaughtQa.slice(0, 250)));
+        } catch (_) {}
+
+        updateDatasetCountBadge();
+        qInput.value = '';
+        aInput.value = '';
+        teachAiForm.classList.add('hidden');
+        showToast('New Q&A pair learned and added to the NLP retrieval dataset!');
+      });
 
       function openMatchRoom({ roomId, partnerAlias, mood, interest, endsAt, localMode }) {
         clearTimeout(matchFallbackTimer);
@@ -1540,9 +1808,11 @@
         isLocalMatchSession = Boolean(localMode);
         currentRoomId = roomId;
         activeMatchMood = mood || 'Overthinking';
-        activePeerAlias = partnerAlias || 'Gentle Echo #44';
+        activeMatchInterest = interest || 'ANY';
+        activePeerAlias = partnerAlias || 'Simi • SafeSpace AI';
         roomUnlocked = false;
-        localBotTurn = 0;
+        lastUserUtterance = '';
+        usedAnswerIndices.clear();
         renderedMsgIds.clear();
 
         searchStatus.classList.add('hidden');
@@ -1550,7 +1820,7 @@
         chatRoom.classList.remove('hidden');
         decisionBox.classList.add('hidden');
         decisionActions.classList.remove('hidden');
-        decisionPrompt.textContent = 'Time is up! Would you like to continue chatting anonymously?';
+        decisionPrompt.textContent = 'Time is up! Would you like to keep talking?';
 
         chatInput.disabled = false;
         chatSendBtn.disabled = false;
@@ -1561,8 +1831,8 @@
 
         chatMessages.innerHTML = `
           <div class="msg system">
-            Connected with ${escapeHTML(activePeerAlias)} on #${escapeHTML(activeMatchMood)} (${escapeHTML(interestLabels[interest] || interest)}).
-            ${localMode ? 'Instant peer room active.' : 'Synchronized 1-minute session started.'}
+            Talking with ${escapeHTML(activePeerAlias)} on #${escapeHTML(activeMatchMood)} (${escapeHTML(interestLabels[interest] || interest)}).
+            ${localMode ? 'SimSimi-style NLP chat active.' : 'Synchronized 1-minute session started.'}
           </div>
         `;
 
@@ -1573,7 +1843,6 @@
         if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
         renderedMsgIds.add(msg.id);
 
-        // Accurate ownership check across both local fallback sessions and Socket.IO rooms
         const isMine = isLocalMatchSession
           ? msg.senderId === 'me'
           : (msg.senderId === 'me' || (socket && socket.id && msg.senderId === socket.id));
@@ -1628,9 +1897,9 @@
 
         matchFallbackTimer = setTimeout(() => {
           if (!currentRoomId && isSearchingMatch) {
-            const peerAlias = generateAlias();
+            const peerAlias = 'Simi • SafeSpace AI';
             openMatchRoom({
-              roomId: `local-room-${Date.now()}`,
+              roomId: `simi-room-${Date.now()}`,
               partnerAlias: peerAlias,
               mood,
               interest,
@@ -1641,17 +1910,20 @@
             const roomSnapshot = currentRoomId;
             botReplyTimer = setTimeout(() => {
               if (currentRoomId !== roomSnapshot) return;
+              const interestNote = interest && interest !== 'ANY'
+                ? ` + ${interestLabels[interest] || interest}`
+                : '';
               appendChatMessage({
                 id: `bot-open-${Date.now()}`,
                 roomId: roomSnapshot,
                 senderId: 'peer-bot',
                 alias: peerAlias,
-                text: `Hey there—I also selected #${mood}. You have a safe minute here to share whatever is on your mind.`,
+                text: `Hey!! Need someone to talk to? We're here 🐥 I'm tuned into #${mood}${interestNote}—say hi, vent, or ask me anything!`,
                 createdAt: Date.now()
               });
-            }, 650);
+            }, 450);
           }
-        }, 1400);
+        }, 500);
       });
 
       document.getElementById('cancel-match-btn').addEventListener('click', () => {
@@ -1694,6 +1966,8 @@
         const text = chatInput.value.trim();
         if (!text) return;
 
+        lastUserUtterance = text;
+
         if (isLocalMatchSession) {
           appendChatMessage({
             id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -1708,18 +1982,20 @@
           const activeRoomSnapshot = currentRoomId;
           const peerSnapshot = activePeerAlias;
           const moodSnapshot = activeMatchMood;
+          const interestSnapshot = activeMatchInterest;
 
           botReplyTimer = setTimeout(() => {
             if (currentRoomId !== activeRoomSnapshot) return;
+            const retrievedReply = retrieveConversationalResponse(text, moodSnapshot, interestSnapshot);
             appendChatMessage({
               id: `bot-reply-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
               roomId: activeRoomSnapshot,
               senderId: 'peer-bot',
               alias: peerSnapshot,
-              text: getNextLocalPeerReply(moodSnapshot),
+              text: retrievedReply,
               createdAt: Date.now()
             });
-          }, 950);
+          }, 500);
         } else if (socket && socket.connected) {
           socket.emit('match:message', {
             roomId: currentRoomId,
@@ -1743,7 +2019,7 @@
           timerDisplay.textContent = 'Unlocked ∞';
           const sys = document.createElement('div');
           sys.className = 'msg system';
-          sys.textContent = 'Chat unlocked! You can keep messaging freely.';
+          sys.textContent = 'Chat unlocked! Keep talking for as long as you like.';
           chatMessages.appendChild(sys);
           chatMessages.scrollTop = chatMessages.scrollHeight;
           return;
@@ -1757,7 +2033,7 @@
         if (!currentRoomId) return;
         if (isLocalMatchSession || !socket || !socket.connected) {
           resetChatUI();
-          showToast('Empathy chat session ended.');
+          showToast('Chat session ended.');
           return;
         }
         socket.emit('match:consent', { roomId: currentRoomId, agree: false });
@@ -1785,7 +2061,7 @@
         chatRoom.classList.add('hidden');
         decisionBox.classList.add('hidden');
         decisionActions.classList.remove('hidden');
-        decisionPrompt.textContent = 'Time is up! Would you like to continue chatting anonymously?';
+        decisionPrompt.textContent = 'Time is up! Would you like to keep talking?';
         matchLobby.classList.remove('hidden');
 
         chatMessages.innerHTML = '';
@@ -1839,13 +2115,11 @@
         liveSyncInitialized = true;
         setPresenceUI({ online: false, statusText: 'Waking Server...' });
 
-        // Send a background wake-up ping to Render's free tier (takes ~30s on cold start)
         fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
           method: 'GET',
           cache: 'no-store'
         }).catch(() => {});
 
-        // Connect Socket.IO directly with extended timeout & automatic retries so it wakes the server
         socket = window.io(BACKEND_BASE_URL, {
           query: { alias: myAlias },
           transports: ['polling', 'websocket'],
@@ -1903,7 +2177,6 @@
         });
 
         socket.on('match:paired', (data) => {
-          // Prevent server match event from overriding an already-active local or remote chat
           if (currentRoomId || isLocalMatchSession) return;
           clearTimeout(matchFallbackTimer);
           openMatchRoom({
@@ -2029,7 +2302,6 @@
             await audioCtx.resume();
           }
 
-          // Abort if user clicked Pause or switched tracks again while resuming
           if (seq !== trackStartSeq) return;
 
           stopAudioNodes();
