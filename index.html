@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SafeSpace — Anonymous Freedom Wall</title>
-  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <!-- Optional Socket.IO client; app degrades gracefully if offline/blocked -->
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" defer></script>
   <style>
     :root {
       --bg: #181716;
@@ -16,6 +17,7 @@
       --accent: #b08968;
       --accent-hover: #c59b78;
       --danger: #b85450;
+      --danger-hover: #c9625e;
       --success: #6a994e;
     }
 
@@ -23,7 +25,7 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
     body {
@@ -32,9 +34,11 @@
       line-height: 1.6;
       max-width: 760px;
       margin: 0 auto;
-      padding: 1.5rem 1rem 6rem;
+      padding: 1.5rem 1rem 9rem;
+      overflow-x: hidden;
     }
 
+    /* HEADER & IDENTITY */
     header {
       display: flex;
       justify-content: space-between;
@@ -48,6 +52,7 @@
     header h1 {
       font-size: 1.5rem;
       color: var(--accent);
+      letter-spacing: -0.02em;
     }
 
     header p {
@@ -65,9 +70,12 @@
     .identity-badge {
       background: var(--surface);
       padding: 0.4rem 0.8rem;
-      border-radius: 6px;
+      border-radius: 8px;
       border: 1px solid var(--border);
       font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
     }
 
     .sync-status {
@@ -84,6 +92,7 @@
       border-radius: 50%;
       background: var(--accent);
       display: inline-block;
+      transition: background-color 0.25s ease;
     }
 
     .sync-dot.online {
@@ -95,10 +104,52 @@
       border: none;
       color: var(--accent);
       cursor: pointer;
-      font-size: 1rem;
-      margin-left: 0.3rem;
+      font-size: 1.05rem;
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      transition: transform 0.2s ease, color 0.2s ease;
     }
 
+    #reroll-alias:hover {
+      color: var(--accent-hover);
+      transform: rotate(90deg);
+    }
+
+    /* NON-BLOCKING IN-APP TOAST BANNER */
+    .toast-banner {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      font-size: 0.88rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .toast-close {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.15rem 0.4rem;
+    }
+
+    .toast-close:hover {
+      color: var(--text);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* TABS */
     .tabs {
       display: flex;
       gap: 0.5rem;
@@ -107,14 +158,20 @@
 
     .tab-btn {
       flex: 1;
-      padding: 0.7rem;
+      padding: 0.75rem;
       background: var(--surface);
       border: 1px solid var(--border);
       color: var(--muted);
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
+      font-size: 0.92rem;
       transition: 0.2s;
+    }
+
+    .tab-btn:hover:not(.active) {
+      background: var(--surface-hover);
+      color: var(--text);
     }
 
     .tab-btn.active {
@@ -131,12 +188,18 @@
       display: block;
     }
 
+    /* CARDS & FORM CONTROLS */
     .composer-card, .post-card, .match-card, .chat-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.2rem;
+      border-radius: 10px;
+      padding: 1.25rem;
       margin-bottom: 1rem;
+    }
+
+    .composer-card h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
     }
 
     textarea, select, input[type="text"] {
@@ -144,9 +207,21 @@
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 0.7rem;
-      border-radius: 6px;
+      padding: 0.7rem 0.8rem;
+      border-radius: 8px;
       margin-top: 0.6rem;
+      font-size: 0.92rem;
+      transition: border-color 0.2s ease;
+    }
+
+    textarea:focus, select:focus, input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 82px;
     }
 
     .composer-controls {
@@ -154,8 +229,8 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.6rem;
-      margin-top: 0.8rem;
+      gap: 0.65rem;
+      margin-top: 0.85rem;
     }
 
     .select-group {
@@ -172,9 +247,17 @@
     .toggle-label {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.45rem;
       font-size: 0.85rem;
       color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-label input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 15px;
+      height: 15px;
       cursor: pointer;
     }
 
@@ -182,24 +265,32 @@
       background: var(--accent);
       color: #181716;
       border: none;
-      padding: 0.6rem 1.2rem;
-      border-radius: 6px;
+      padding: 0.62rem 1.2rem;
+      border-radius: 8px;
       font-weight: 600;
+      font-size: 0.9rem;
       cursor: pointer;
+      transition: background-color 0.2s ease, opacity 0.2s ease;
     }
 
-    .primary-btn:hover {
+    .primary-btn:hover:not(:disabled) {
       background: var(--accent-hover);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .secondary-btn {
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
-      padding: 0.5rem 0.9rem;
-      border-radius: 6px;
+      padding: 0.55rem 0.9rem;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 0.85rem;
+      transition: border-color 0.2s ease;
     }
 
     .secondary-btn:hover {
@@ -210,18 +301,26 @@
       background: var(--danger);
       color: #fff;
       border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 6px;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.88rem;
       cursor: pointer;
+      transition: background-color 0.2s ease;
     }
 
+    .danger-btn:hover {
+      background: var(--danger-hover);
+    }
+
+    /* FILTER BAR */
     .filter-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 0.6rem;
       margin-bottom: 1rem;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--muted);
     }
 
@@ -230,6 +329,7 @@
       margin-top: 0;
     }
 
+    /* POSTS & COMMENTS */
     .post-header {
       display: flex;
       justify-content: space-between;
@@ -238,7 +338,7 @@
       gap: 0.4rem;
       font-size: 0.85rem;
       color: var(--muted);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.55rem;
     }
 
     .badge-group {
@@ -250,9 +350,10 @@
     .badge {
       background: var(--bg);
       color: var(--accent);
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
+      padding: 0.18rem 0.55rem;
+      border-radius: 6px;
       font-size: 0.75rem;
+      font-weight: 500;
       border: 1px solid var(--border);
     }
 
@@ -265,14 +366,15 @@
       margin: 0.6rem 0 1rem;
       white-space: pre-wrap;
       word-break: break-word;
+      font-size: 0.96rem;
     }
 
     .comments-locked {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: var(--muted);
       font-style: italic;
       border-top: 1px solid var(--border);
-      padding-top: 0.6rem;
+      padding-top: 0.65rem;
     }
 
     .comments-section {
@@ -285,21 +387,23 @@
       justify-content: space-between;
       align-items: flex-start;
       gap: 0.6rem;
-      font-size: 0.85rem;
+      font-size: 0.86rem;
       background: var(--bg);
-      padding: 0.5rem 0.7rem;
-      border-radius: 5px;
-      margin-bottom: 0.4rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.45rem;
+      word-break: break-word;
     }
 
     .report-trigger {
       background: none;
       border: none;
       color: var(--muted);
-      font-size: 0.72rem;
+      font-size: 0.73rem;
       cursor: pointer;
       white-space: nowrap;
-      opacity: 0.75;
+      opacity: 0.78;
+      padding: 0.1rem 0.25rem;
     }
 
     .report-trigger:hover {
@@ -310,7 +414,7 @@
     .comment-form {
       display: flex;
       gap: 0.5rem;
-      margin-top: 0.5rem;
+      margin-top: 0.55rem;
     }
 
     .comment-form input {
@@ -321,37 +425,50 @@
       display: none !important;
     }
 
+    /* EMPATHY MATCH LOBBY & CHAT ROOM */
     .match-card {
       text-align: center;
-      padding: 2rem 1.2rem;
+      padding: 2rem 1.25rem;
+    }
+
+    .match-card h2 {
+      font-size: 1.35rem;
+      margin-bottom: 0.45rem;
+    }
+
+    .match-card p {
+      color: var(--muted);
+      font-size: 0.92rem;
+      max-width: 540px;
+      margin: 0 auto;
     }
 
     .match-selectors {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 0.8rem;
-      margin: 1.2rem auto;
+      gap: 0.85rem;
+      margin: 1.35rem auto;
       max-width: 520px;
     }
 
     .match-selectors .field-box {
       flex: 1;
-      min-width: 200px;
+      min-width: 210px;
       text-align: left;
     }
 
     .match-selectors label {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       color: var(--muted);
     }
 
     .match-selectors select {
-      margin-top: 0.3rem;
+      margin-top: 0.35rem;
     }
 
     .status-text {
-      margin-top: 1.2rem;
+      margin-top: 1.25rem;
       color: var(--accent);
       font-size: 0.9rem;
       background: var(--bg);
@@ -367,6 +484,7 @@
       text-decoration: underline;
       cursor: pointer;
       margin-left: 0.4rem;
+      font-size: 0.88rem;
     }
 
     .chat-header {
@@ -374,33 +492,43 @@
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      padding-bottom: 0.8rem;
+      gap: 0.55rem;
+      padding-bottom: 0.85rem;
       border-bottom: 1px solid var(--border);
     }
 
+    .chat-partner-info {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      font-size: 0.9rem;
+    }
+
     .timer-box {
-      font-weight: bold;
-      font-size: 1.05rem;
+      font-weight: 700;
+      font-size: 1.02rem;
       color: var(--accent);
       background: var(--bg);
-      padding: 0.3rem 0.8rem;
-      border-radius: 6px;
+      padding: 0.32rem 0.8rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
     }
 
     .chat-messages {
-      height: 300px;
+      height: 310px;
       overflow-y: auto;
       padding: 1rem 0.4rem;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.65rem;
     }
 
     .msg {
       max-width: 78%;
-      padding: 0.6rem 0.9rem;
-      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      border-radius: 10px;
       font-size: 0.9rem;
       word-break: break-word;
     }
@@ -409,6 +537,7 @@
       align-self: flex-end;
       background: var(--accent);
       color: #181716;
+      font-weight: 500;
     }
 
     .msg.theirs {
@@ -422,33 +551,36 @@
       justify-content: space-between;
       align-items: center;
       gap: 0.8rem;
-      margin-bottom: 0.2rem;
+      margin-bottom: 0.25rem;
       font-size: 0.78rem;
+      color: var(--muted);
     }
 
     .msg.system {
       align-self: center;
       background: none;
       color: var(--muted);
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-style: italic;
       text-align: center;
+      max-width: 92%;
     }
 
     .decision-box {
       background: var(--bg);
       border: 1px solid var(--accent);
       padding: 1rem;
-      border-radius: 6px;
+      border-radius: 8px;
       text-align: center;
-      margin-bottom: 0.8rem;
+      margin-bottom: 0.85rem;
     }
 
     .decision-actions {
       display: flex;
       justify-content: center;
       gap: 0.8rem;
-      margin-top: 0.7rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
     }
 
     .chat-input-area {
@@ -469,7 +601,7 @@
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.72);
+      background: rgba(0, 0, 0, 0.74);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -480,32 +612,34 @@
     .modal-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 1.3rem;
+      border-radius: 10px;
+      padding: 1.35rem;
       width: 100%;
-      max-width: 400px;
+      max-width: 410px;
     }
 
     .modal-card h4 {
       color: var(--accent);
       margin-bottom: 0.4rem;
+      font-size: 1.05rem;
     }
 
     .modal-quote {
       background: var(--bg);
       border-left: 3px solid var(--danger);
-      padding: 0.5rem 0.7rem;
-      font-size: 0.82rem;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.83rem;
       color: var(--muted);
-      margin: 0.7rem 0;
-      max-height: 80px;
+      margin: 0.75rem 0;
+      max-height: 85px;
       overflow-y: auto;
+      border-radius: 0 6px 6px 0;
     }
 
     .modal-actions {
       display: flex;
       justify-content: flex-end;
-      gap: 0.5rem;
+      gap: 0.55rem;
       margin-top: 1rem;
     }
 
@@ -514,11 +648,12 @@
       position: fixed;
       right: 1rem;
       bottom: 1rem;
-      width: 265px;
+      width: 272px;
+      max-width: calc(100vw - 2rem);
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 10px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48);
       z-index: 900;
       overflow: hidden;
     }
@@ -527,13 +662,14 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.55rem 0.85rem;
+      padding: 0.6rem 0.85rem;
       background: var(--bg);
       border-bottom: 1px solid var(--border);
       cursor: pointer;
-      font-size: 0.82rem;
+      font-size: 0.83rem;
       font-weight: 600;
       color: var(--accent);
+      user-select: none;
     }
 
     .music-body {
@@ -547,7 +683,7 @@
     .track-now {
       font-size: 0.82rem;
       color: var(--text);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.55rem;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -557,17 +693,22 @@
       display: flex;
       align-items: center;
       gap: 0.4rem;
-      margin-bottom: 0.6rem;
+      margin-bottom: 0.65rem;
     }
 
     .music-controls button {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 0.3rem 0.6rem;
-      border-radius: 5px;
+      padding: 0.32rem 0.6rem;
+      border-radius: 6px;
       cursor: pointer;
       font-size: 0.8rem;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .music-controls button:hover {
+      border-color: var(--accent);
     }
 
     .music-controls button.playing {
@@ -581,30 +722,63 @@
       flex: 1;
       accent-color: var(--accent);
       cursor: pointer;
+      min-width: 60px;
     }
 
     .playlist-list {
       list-style: none;
       border-top: 1px solid var(--border);
-      padding-top: 0.45rem;
+      padding-top: 0.5rem;
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
     }
 
     .playlist-item {
-      font-size: 0.78rem;
+      font-size: 0.79rem;
       color: var(--muted);
-      padding: 0.3rem 0.45rem;
-      border-radius: 4px;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
     .playlist-item:hover, .playlist-item.active {
       background: var(--bg);
       color: var(--accent);
+    }
+
+    /* RESPONSIVE ADJUSTMENTS */
+    @media (max-width: 540px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .header-right {
+        align-items: flex-start;
+        width: 100%;
+      }
+
+      .composer-controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .select-group {
+        width: 100%;
+      }
+
+      .composer-controls select {
+        flex: 1;
+      }
+
+      .msg {
+        max-width: 88%;
+      }
     }
   </style>
 </head>
@@ -616,19 +790,25 @@
     </div>
     <div class="header-right">
       <div class="identity-badge">
-        Your Session Alias: <strong id="user-alias">Loading...</strong>
-        <button id="reroll-alias" title="Generate new anonymous name">↻</button>
+        <span>Your Session Alias: <strong id="user-alias">Loading...</strong></span>
+        <button id="reroll-alias" type="button" title="Generate new anonymous name" aria-label="Generate new anonymous name">↻</button>
       </div>
       <div class="sync-status">
         <span id="sync-dot" class="sync-dot"></span>
-        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Ready</span>
+        <span id="sync-label">🟡 <strong id="active-users-count">1</strong> Users Active Online • Standalone Mode</span>
       </div>
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab-btn active" data-target="wall-section">Freedom Wall</button>
-    <button class="tab-btn" data-target="match-section">1-Minute Empathy Match</button>
+  <!-- NON-BLOCKING STATUS TOAST -->
+  <div id="status-toast" class="toast-banner hidden" role="status" aria-live="polite">
+    <span id="status-toast-text"></span>
+    <button id="status-toast-close" type="button" class="toast-close" aria-label="Dismiss notification">✕</button>
+  </div>
+
+  <nav class="tabs" aria-label="Main Sections">
+    <button type="button" class="tab-btn active" data-target="wall-section">Freedom Wall</button>
+    <button type="button" class="tab-btn" data-target="match-section">1-Minute Empathy Match</button>
   </nav>
 
   <main>
@@ -640,7 +820,7 @@
 
         <div class="composer-controls">
           <div class="select-group">
-            <select id="post-mood" title="Experience / Mood">
+            <select id="post-mood" title="Experience / Mood" aria-label="Experience or Mood">
               <option value="Overthinking">#Overthinking</option>
               <option value="Burnout">#Burnout</option>
               <option value="AcademicPressure">#AcademicPressure</option>
@@ -649,7 +829,7 @@
               <option value="Grateful">#Grateful</option>
             </select>
 
-            <select id="post-interest" title="Interest Tag">
+            <select id="post-interest" title="Interest Tag" aria-label="Interest Tag">
               <option value="Coffee">Iced Coffee</option>
               <option value="Coding">Coding &amp; Tech</option>
               <option value="Gaming">Gaming</option>
@@ -665,13 +845,13 @@
             <span>Allow supportive comments</span>
           </label>
 
-          <button id="submit-post" class="primary-btn">Post Anonymously</button>
+          <button id="submit-post" type="button" class="primary-btn">Post Anonymously</button>
         </div>
       </div>
 
       <div class="filter-bar">
         <span>Filter by experience &amp; interest:</span>
-        <select id="filter-mood">
+        <select id="filter-mood" aria-label="Filter by Experience">
           <option value="ALL">All Experiences</option>
           <option value="Overthinking">#Overthinking</option>
           <option value="Burnout">#Burnout</option>
@@ -681,7 +861,7 @@
           <option value="Grateful">#Grateful</option>
         </select>
 
-        <select id="filter-interest">
+        <select id="filter-interest" aria-label="Filter by Interest">
           <option value="ALL">All Interests</option>
           <option value="Coffee">Iced Coffee</option>
           <option value="Coding">Coding &amp; Tech</option>
@@ -732,35 +912,35 @@
           </div>
         </div>
 
-        <button id="start-match-btn" class="primary-btn">Find a Match</button>
+        <button id="start-match-btn" type="button" class="primary-btn">Find a Match</button>
 
         <div id="search-status" class="status-text hidden">
           <p>
             Looking for someone experiencing <strong id="searching-mood"></strong>
             (<span id="searching-interest"></span>)...
-            <button id="cancel-match-btn" class="link-btn">Cancel</button>
+            <button id="cancel-match-btn" type="button" class="link-btn">Cancel</button>
           </p>
         </div>
       </div>
 
       <div id="chat-room" class="chat-card hidden">
         <div class="chat-header">
-          <div>
+          <div class="chat-partner-info">
             <span>Chatting with <strong id="partner-alias"></strong></span>
             <span class="badge" id="chat-mood-badge"></span>
             <span class="badge interest" id="chat-interest-badge"></span>
           </div>
           <div class="timer-box" id="timer-display">01:00</div>
-          <button id="leave-chat-btn" class="danger-btn">Leave</button>
+          <button id="leave-chat-btn" type="button" class="danger-btn">Leave</button>
         </div>
 
         <div id="chat-messages" class="chat-messages"></div>
 
         <div id="decision-box" class="decision-box hidden">
           <p id="decision-prompt">Time is up! Would you like to continue chatting anonymously?</p>
-          <div class="decision-actions">
-            <button id="consent-yes" class="primary-btn">Yes, continue</button>
-            <button id="consent-no" class="danger-btn">No, end chat</button>
+          <div id="decision-actions" class="decision-actions">
+            <button id="consent-yes" type="button" class="primary-btn">Yes, continue</button>
+            <button id="consent-no" type="button" class="danger-btn">No, end chat</button>
           </div>
         </div>
 
@@ -773,9 +953,9 @@
   </main>
 
   <!-- REPORT MODAL -->
-  <div id="report-modal" class="modal-backdrop hidden">
+  <div id="report-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
     <div class="modal-card">
-      <h4>Report Content</h4>
+      <h4 id="report-modal-title">Report Content</h4>
       <p style="font-size: 0.84rem; color: var(--muted);">Flagged content will be hidden from your view and logged for moderation.</p>
       <div id="report-preview" class="modal-quote"></div>
       <label for="report-reason" style="font-size: 0.82rem; color: var(--muted);">Reason:</label>
@@ -786,14 +966,14 @@
         <option value="Inappropriate or explicit content">Inappropriate or explicit content</option>
       </select>
       <div class="modal-actions">
-        <button id="cancel-report-btn" class="secondary-btn">Cancel</button>
-        <button id="submit-report-btn" class="danger-btn">Submit Report</button>
+        <button id="cancel-report-btn" type="button" class="secondary-btn">Cancel</button>
+        <button id="submit-report-btn" type="button" class="danger-btn">Submit Report</button>
       </div>
     </div>
   </div>
 
   <!-- RIGHT-SIDE CORNER AMBIENT PLAYLIST WIDGET -->
-  <aside id="music-widget" class="music-widget">
+  <aside id="music-widget" class="music-widget" aria-label="Ambient Radio Player">
     <div id="music-toggle-header" class="music-header">
       <span>🎵 SafeSpace Chill Radio</span>
       <span id="music-collapse-icon">▾</span>
@@ -801,10 +981,10 @@
     <div class="music-body">
       <div id="track-now" class="track-now">Paused — Rainy Café Ambience</div>
       <div class="music-controls">
-        <button id="prev-track-btn" title="Previous">⏮</button>
-        <button id="play-pause-btn" title="Play / Pause">▶ Play</button>
-        <button id="next-track-btn" title="Next">⏭</button>
-        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.35" title="Volume" />
+        <button id="prev-track-btn" type="button" title="Previous Track" aria-label="Previous Track">⏮</button>
+        <button id="play-pause-btn" type="button" title="Play or Pause">▶ Play</button>
+        <button id="next-track-btn" type="button" title="Next Track" aria-label="Next Track">⏭</button>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.35" title="Volume" aria-label="Volume" />
       </div>
       <ul id="playlist-list" class="playlist-list">
         <li class="playlist-item active" data-index="0"><span>1. Rainy Café Ambience</span><span>☕</span></li>
@@ -815,898 +995,1104 @@
   </aside>
 
   <script>
-    const BACKEND_BASE_URL =
-      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:3001'
-        : 'https://safespace-realtime-server.onrender.com';
+    window.addEventListener('DOMContentLoaded', () => {
+      // Backend URL configuration (optional real-time server; never blocks local experience)
+      const BACKEND_BASE_URL =
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:3001'
+          : 'https://safespace-realtime-server.onrender.com';
 
-    const LOCAL_POSTS_KEY = 'safespace_posts_v3';
+      const LOCAL_POSTS_KEY = 'safespace_posts_v3';
 
-    const interestLabels = {
-      ANY: 'Any Interest',
-      Coffee: 'Iced Coffee',
-      Coding: 'Coding & Tech',
-      Gaming: 'Gaming',
-      Music: 'Music',
-      Design: 'Graphic Design',
-      Fitness: 'Exercise & Fitness',
-      Pets: 'Pets'
-    };
+      const interestLabels = {
+        ANY: 'Any Interest',
+        Coffee: 'Iced Coffee',
+        Coding: 'Coding & Tech',
+        Gaming: 'Gaming',
+        Music: 'Music',
+        Design: 'Graphic Design',
+        Fitness: 'Exercise & Fitness',
+        Pets: 'Pets'
+      };
 
-    const starterPosts = [
-      {
-        id: 'seed-1',
-        alias: 'Quiet Lantern #21',
-        mood: 'Overthinking',
-        interest: 'Coffee',
-        content: 'Late-night iced coffee keeps me company while I plan tomorrow, even when my brain replays every detail.',
-        allowComments: true,
-        createdAt: 1700000003000,
-        timestamp: 'Just now',
-        comments: [
-          {
-            id: 'seed-c1',
-            alias: 'Gentle Fox #14',
-            text: 'Take it one small step at a time tonight—you do not have to solve everything at once.',
-            createdAt: 1700000003500
-          }
-        ]
-      },
-      {
-        id: 'seed-2',
-        alias: 'Calm River #58',
-        mood: 'Burnout',
-        interest: 'Coding',
-        content: 'Stepping away from the screen for a bit after debugging loops all day. Rest counts as progress too.',
-        allowComments: true,
-        createdAt: 1700000002000,
-        timestamp: '12m ago',
-        comments: []
-      },
-      {
-        id: 'seed-3',
-        alias: 'Warm Breeze #39',
-        mood: 'Grateful',
-        interest: 'Fitness',
-        content: 'Finished a short evening stretch and felt my shoulders drop for the first time all week.',
-        allowComments: false,
-        createdAt: 1700000001000,
-        timestamp: '28m ago',
-        comments: []
-      }
-    ];
-
-    const adjectives = ['Quiet', 'Midnight', 'Gentle', 'Wandering', 'Hidden', 'Calm', 'Silver', 'Warm'];
-    const nouns = ['Fox', 'Coffee', 'Cloud', 'Lantern', 'River', 'Star', 'Echo', 'Breeze'];
-
-    function generateAlias() {
-      const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-      const noun = nouns[Math.floor(Math.random() * nouns.length)];
-      const num = Math.floor(Math.random() * 90) + 10;
-      return `${adj} ${noun} #${num}`;
-    }
-
-    let myAlias = sessionStorage.getItem('safespace_tab_alias') || generateAlias();
-    sessionStorage.setItem('safespace_tab_alias', myAlias);
-
-    const aliasDisplay = document.getElementById('user-alias');
-    const syncDot = document.getElementById('sync-dot');
-    const syncLabel = document.getElementById('sync-label');
-    aliasDisplay.textContent = myAlias;
-
-    const postsMap = {};
-    let latestOnlineCount = 1;
-    let socket = null;
-    let matchFallbackTimer = null;
-    let botReplyTimer = null;
-    let isLocalMatchSession = false;
-
-    function loadStoredPosts() {
-      try {
-        const raw = localStorage.getItem(LOCAL_POSTS_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+      const starterPosts = [
+        {
+          id: 'seed-1',
+          alias: 'Quiet Lantern #21',
+          mood: 'Overthinking',
+          interest: 'Coffee',
+          content: 'Late-night iced coffee keeps me company while I plan tomorrow, even when my brain replays every detail.',
+          allowComments: true,
+          createdAt: 1700000003000,
+          timestamp: 'Just now',
+          comments: [
+            {
+              id: 'seed-c1',
+              alias: 'Gentle Fox #14',
+              text: 'Take it one small step at a time tonight—you do not have to solve everything at once.',
+              createdAt: 1700000003500
+            }
+          ]
+        },
+        {
+          id: 'seed-2',
+          alias: 'Calm River #58',
+          mood: 'Burnout',
+          interest: 'Coding',
+          content: 'Stepping away from the screen for a bit after debugging loops all day. Rest counts as progress too.',
+          allowComments: true,
+          createdAt: 1700000002000,
+          timestamp: '12m ago',
+          comments: []
+        },
+        {
+          id: 'seed-3',
+          alias: 'Warm Breeze #39',
+          mood: 'Grateful',
+          interest: 'Fitness',
+          content: 'Finished a short evening stretch and felt my shoulders drop for the first time all week.',
+          allowComments: false,
+          createdAt: 1700000001000,
+          timestamp: '28m ago',
+          comments: []
         }
-      } catch (_) {}
-      return starterPosts;
-    }
+      ];
 
-    function saveStoredPosts() {
-      try {
-        const list = Object.values(postsMap)
-          .filter(p => p && p.id && p.content)
-          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-          .slice(0, 100);
-        if (list.length > 0) {
-          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(list));
-        }
-      } catch (_) {}
-    }
+      // --- SESSION ALIAS MANAGEMENT ---
+      const adjectives = ['Quiet', 'Midnight', 'Gentle', 'Wandering', 'Hidden', 'Calm', 'Silver', 'Warm'];
+      const nouns = ['Fox', 'Coffee', 'Cloud', 'Lantern', 'River', 'Star', 'Echo', 'Breeze'];
 
-    function hydratePosts(list) {
-      const valid = Array.isArray(list) ? list.filter(p => p && p.id && p.content) : [];
-      valid.forEach(post => {
-        const existing = postsMap[post.id];
-        const mergedComments = Array.isArray(post.comments) && post.comments.length > 0
-          ? post.comments
-          : (existing && Array.isArray(existing.comments) ? existing.comments : []);
-        postsMap[post.id] = {
-          ...existing,
-          ...post,
-          comments: mergedComments
-        };
-      });
-
-      if (Object.keys(postsMap).length === 0) {
-        starterPosts.forEach(p => {
-          postsMap[p.id] = { ...p, comments: Array.isArray(p.comments) ? [...p.comments] : [] };
-        });
+      function generateAlias() {
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+        const noun = nouns[Math.floor(Math.random() * nouns.length)];
+        const num = Math.floor(Math.random() * 90) + 10;
+        return `${adj} ${noun} #${num}`;
       }
 
-      saveStoredPosts();
-      renderPosts();
-    }
-
-    function setPresenceUI({ online, statusText, count }) {
-      if (typeof count === 'number') {
-        latestOnlineCount = Math.max(1, count);
-      }
-      syncDot.classList.toggle('online', Boolean(online));
-      const suffix = statusText ? ` • ${statusText}` : '';
-      syncLabel.innerHTML =
-        `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(suffix)}`;
-    }
-
-    // Hydrate posts right away so Freedom Wall has posts on initial load
-    hydratePosts(loadStoredPosts());
-    setPresenceUI({ online: false, statusText: 'GitHub Ready' });
-
-    document.getElementById('reroll-alias').addEventListener('click', () => {
-      myAlias = generateAlias();
+      let myAlias = sessionStorage.getItem('safespace_tab_alias') || generateAlias();
       sessionStorage.setItem('safespace_tab_alias', myAlias);
+
+      const aliasDisplay = document.getElementById('user-alias');
+      const syncDot = document.getElementById('sync-dot');
+      const syncLabel = document.getElementById('sync-label');
       aliasDisplay.textContent = myAlias;
-      if (socket && socket.connected) {
-        socket.emit('identity:update_alias', { alias: myAlias });
-      }
-    });
 
-    // Tab Navigation
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.target).classList.add('active');
+      // --- NON-BLOCKING TOAST HELPER (Replaces alert()) ---
+      const statusToast = document.getElementById('status-toast');
+      const statusToastText = document.getElementById('status-toast-text');
+      let toastTimeout = null;
+
+      function showToast(message) {
+        if (!message) return;
+        clearTimeout(toastTimeout);
+        statusToastText.textContent = message;
+        statusToast.classList.remove('hidden');
+        toastTimeout = setTimeout(() => {
+          statusToast.classList.add('hidden');
+        }, 5000);
+      }
+
+      document.getElementById('status-toast-close').addEventListener('click', () => {
+        clearTimeout(toastTimeout);
+        statusToast.classList.add('hidden');
       });
-    });
 
-    // --- REPORTING SYSTEM ---
-    const hiddenItems = new Set(JSON.parse(sessionStorage.getItem('safespace_hidden_items') || '[]'));
-    let pendingReport = null;
+      // --- POSTS STATE & DEDUPLICATION ---
+      const postsMap = {};
+      let latestOnlineCount = 1;
+      let socket = null;
+      let matchFallbackTimer = null;
+      let botReplyTimer = null;
+      let isLocalMatchSession = false;
+      let isSearchingMatch = false;
 
-    const reportModal = document.getElementById('report-modal');
-    const reportPreview = document.getElementById('report-preview');
-    const reportReason = document.getElementById('report-reason');
+      // Initialize feed & filter DOM references before hydratePosts() calls renderPosts()
+      const postsFeed = document.getElementById('posts-feed');
+      const filterMood = document.getElementById('filter-mood');
+      const filterInterest = document.getElementById('filter-interest');
 
-    function openReportModal(targetType, targetId, authorAlias, text) {
-      pendingReport = { targetType, targetId, authorAlias, text };
-      reportPreview.textContent = `${authorAlias}: "${text}"`;
-      reportModal.classList.remove('hidden');
-    }
+      let hiddenItems = new Set();
+      try {
+        hiddenItems = new Set(JSON.parse(sessionStorage.getItem('safespace_hidden_items') || '[]'));
+      } catch (_) {}
 
-    document.getElementById('cancel-report-btn').addEventListener('click', () => {
-      pendingReport = null;
-      reportModal.classList.add('hidden');
-    });
-
-    document.getElementById('submit-report-btn').addEventListener('click', () => {
-      if (!pendingReport) return;
-
-      if (socket && socket.connected) {
-        socket.emit('moderation:report', {
-          targetType: pendingReport.targetType,
-          targetId: pendingReport.targetId,
-          authorAlias: pendingReport.authorAlias,
-          contentSnippet: pendingReport.text,
-          reason: reportReason.value
-        });
+      function clonePost(post) {
+        return {
+          ...post,
+          comments: Array.isArray(post.comments)
+            ? post.comments.map(c => ({ ...c }))
+            : []
+        };
       }
 
-      hiddenItems.add(pendingReport.targetId);
-      sessionStorage.setItem('safespace_hidden_items', JSON.stringify([...hiddenItems]));
+      function loadStoredPosts() {
+        try {
+          const raw = localStorage.getItem(LOCAL_POSTS_KEY);
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (_) {}
+        return starterPosts.map(clonePost);
+      }
 
-      if (pendingReport.targetType === 'chat') {
-        const msgEl = document.querySelector(`[data-msg-id="${pendingReport.targetId}"]`);
-        if (msgEl) {
-          msgEl.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+      function saveStoredPosts() {
+        try {
+          const list = Object.values(postsMap)
+            .filter(p => p && p.id && p.content)
+            .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+            .slice(0, 100);
+          localStorage.setItem(LOCAL_POSTS_KEY, JSON.stringify(list));
+        } catch (_) {}
+      }
+
+      function mergeComments(existingComments = [], incomingComments = []) {
+        const byId = new Map();
+        const sigSet = new Set();
+
+        [...existingComments, ...incomingComments].forEach(c => {
+          if (!c || !c.text) return;
+          const sig = `${c.alias || ''}|${c.text.trim()}`;
+          if (c.id && byId.has(c.id)) return;
+          if (sigSet.has(sig)) return;
+          if (c.id) byId.set(c.id, { ...c });
+          else byId.set(sig, { ...c, id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+          sigSet.add(sig);
+        });
+
+        return Array.from(byId.values()).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      }
+
+      function hydratePosts(list) {
+        const valid = Array.isArray(list) ? list.filter(p => p && p.id && p.content) : [];
+        valid.forEach(post => {
+          // Deduplicate against optimistic client post if server assigned a new ID for identical content
+          const matchingOptimisticKey = Object.keys(postsMap).find(existingId => {
+            const p = postsMap[existingId];
+            return (
+              p &&
+              existingId !== post.id &&
+              p.alias === post.alias &&
+              p.content.trim() === post.content.trim() &&
+              Math.abs((p.createdAt || 0) - (post.createdAt || 0)) < 15000
+            );
+          });
+
+          const existing = postsMap[post.id] || (matchingOptimisticKey ? postsMap[matchingOptimisticKey] : null);
+          if (matchingOptimisticKey) {
+            delete postsMap[matchingOptimisticKey];
+          }
+
+          const mergedComments = mergeComments(
+            existing ? existing.comments : [],
+            post.comments || []
+          );
+
+          postsMap[post.id] = {
+            ...existing,
+            ...post,
+            comments: mergedComments
+          };
+        });
+
+        if (Object.keys(postsMap).length === 0) {
+          starterPosts.forEach(p => {
+            postsMap[p.id] = clonePost(p);
+          });
         }
-      } else {
+
+        saveStoredPosts();
         renderPosts();
       }
 
-      pendingReport = null;
-      reportModal.classList.add('hidden');
-    });
+      function setPresenceUI({ online, statusText, count }) {
+        if (typeof count === 'number') {
+          latestOnlineCount = Math.max(1, count);
+        }
+        syncDot.classList.toggle('online', Boolean(online));
+        const suffix = statusText ? ` • ${statusText}` : '';
+        syncLabel.innerHTML =
+          `${online ? '🟢' : '🟡'} <strong id="active-users-count">${escapeHTML(String(latestOnlineCount))}</strong> Users Active Online${escapeHTML(suffix)}`;
+      }
 
-    // --- FREEDOM WALL POSTING & COMMENTS ---
-    const postsFeed = document.getElementById('posts-feed');
-    const filterMood = document.getElementById('filter-mood');
-    const filterInterest = document.getElementById('filter-interest');
+      hydratePosts(loadStoredPosts());
+      setPresenceUI({ online: false, statusText: 'Standalone Mode' });
 
-    document.getElementById('restore-posts-btn').addEventListener('click', () => {
-      filterMood.value = 'ALL';
-      filterInterest.value = 'ALL';
-      hiddenItems.clear();
-      sessionStorage.removeItem('safespace_hidden_items');
-      hydratePosts(starterPosts);
-    });
+      document.getElementById('reroll-alias').addEventListener('click', () => {
+        myAlias = generateAlias();
+        sessionStorage.setItem('safespace_tab_alias', myAlias);
+        aliasDisplay.textContent = myAlias;
+        if (socket && socket.connected) {
+          socket.emit('identity:update_alias', { alias: myAlias });
+        }
+      });
 
-    document.getElementById('submit-post').addEventListener('click', () => {
-      const content = document.getElementById('post-content').value.trim();
-      const mood = document.getElementById('post-mood').value;
-      const interest = document.getElementById('post-interest').value;
-      const allowComments = document.getElementById('allow-comments').checked;
+      // --- TAB NAVIGATION ---
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.target).classList.add('active');
+        });
+      });
 
-      if (!content) return;
+      // --- REPORTING SYSTEM ---
+      let pendingReport = null;
+      const reportModal = document.getElementById('report-modal');
+      const reportPreview = document.getElementById('report-preview');
+      const reportReason = document.getElementById('report-reason');
 
-      const post = {
-        id: `post-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        alias: myAlias,
-        mood,
-        interest,
-        content,
-        allowComments,
-        createdAt: Date.now(),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        comments: []
-      };
+      function openReportModal(targetType, targetId, authorAlias, text) {
+        pendingReport = { targetType, targetId, authorAlias, text };
+        reportPreview.textContent = `${authorAlias}: "${text}"`;
+        reportModal.classList.remove('hidden');
+      }
 
-      hydratePosts([post]);
+      document.getElementById('cancel-report-btn').addEventListener('click', () => {
+        pendingReport = null;
+        reportModal.classList.add('hidden');
+      });
 
-      if (socket && socket.connected) {
-        socket.emit('wall:create_post', {
+      reportModal.addEventListener('click', (e) => {
+        if (e.target === reportModal) {
+          pendingReport = null;
+          reportModal.classList.add('hidden');
+        }
+      });
+
+      document.getElementById('submit-report-btn').addEventListener('click', () => {
+        if (!pendingReport) return;
+
+        if (socket && socket.connected) {
+          socket.emit('moderation:report', {
+            targetType: pendingReport.targetType,
+            targetId: pendingReport.targetId,
+            authorAlias: pendingReport.authorAlias,
+            contentSnippet: pendingReport.text,
+            reason: reportReason.value
+          });
+        }
+
+        hiddenItems.add(pendingReport.targetId);
+        sessionStorage.setItem('safespace_hidden_items', JSON.stringify([...hiddenItems]));
+
+        if (pendingReport.targetType === 'chat') {
+          const msgEl = document.querySelector(`[data-msg-id="${CSS.escape(pendingReport.targetId)}"]`);
+          if (msgEl) {
+            msgEl.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+          }
+        } else {
+          renderPosts();
+        }
+
+        pendingReport = null;
+        reportModal.classList.add('hidden');
+        showToast('Content reported and hidden from your view.');
+      });
+
+      // --- FREEDOM WALL POSTING & COMMENTS ---
+      // Clean Restore Posts: resets filters, clears hidden items, restores all starter posts cleanly
+      document.getElementById('restore-posts-btn').addEventListener('click', () => {
+        filterMood.value = 'ALL';
+        filterInterest.value = 'ALL';
+        hiddenItems.clear();
+        sessionStorage.removeItem('safespace_hidden_items');
+
+        starterPosts.forEach(seed => {
+          postsMap[seed.id] = clonePost(seed);
+        });
+
+        saveStoredPosts();
+        renderPosts();
+        showToast('Filters reset and starter posts restored.');
+      });
+
+      document.getElementById('submit-post').addEventListener('click', () => {
+        const contentInput = document.getElementById('post-content');
+        const content = contentInput.value.trim();
+        const mood = document.getElementById('post-mood').value;
+        const interest = document.getElementById('post-interest').value;
+        const allowComments = document.getElementById('allow-comments').checked;
+
+        if (!content) {
+          showToast('Please write a thought before posting.');
+          return;
+        }
+
+        const clientPostId = `post-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const createdAt = Date.now();
+        const post = {
+          id: clientPostId,
           alias: myAlias,
           mood,
           interest,
           content,
-          allowComments
-        });
-      }
+          allowComments,
+          createdAt,
+          timestamp: new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          comments: []
+        };
 
-      document.getElementById('post-content').value = '';
-    });
+        hydratePosts([post]);
 
-    filterMood.addEventListener('change', renderPosts);
-    filterInterest.addEventListener('change', renderPosts);
-
-    function renderPosts() {
-      if (Object.keys(postsMap).length === 0) {
-        starterPosts.forEach(p => {
-          postsMap[p.id] = { ...p, comments: Array.isArray(p.comments) ? [...p.comments] : [] };
-        });
-      }
-
-      const selectedMood = filterMood.value;
-      const selectedInterest = filterInterest.value;
-
-      const sortedPosts = Object.values(postsMap)
-        .filter(p => {
-          if (!p || !p.content || hiddenItems.has(p.id)) return false;
-          const matchesMood = selectedMood === 'ALL' || p.mood === selectedMood;
-          const matchesInterest =
-            selectedInterest === 'ALL' ||
-            (p.interest && p.interest === selectedInterest);
-          return matchesMood && matchesInterest;
-        })
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-
-      postsFeed.innerHTML = '';
-
-      if (sortedPosts.length === 0) {
-        postsFeed.innerHTML = `
-          <div class="post-card" style="text-align: center; color: var(--muted);">
-            No posts match this filter yet. Click "Restore Posts" or set filters back to All.
-          </div>
-        `;
-        return;
-      }
-
-      sortedPosts.forEach(post => {
-        const card = document.createElement('div');
-        card.className = 'post-card';
-
-        let commentsHTML = '';
-        if (post.allowComments === false) {
-          commentsHTML = `<div class="comments-locked">🔒 Comments are disabled by the author (Vent-only mode)</div>`;
-        } else {
-          const commentArray = (post.comments || [])
-            .filter(c => c && c.text && !hiddenItems.has(c.id))
-            .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-
-          const list = commentArray.map(c => `
-            <div class="comment-item">
-              <div><strong>${escapeHTML(c.alias)}:</strong> ${escapeHTML(c.text)}</div>
-              <button type="button" class="report-trigger" data-type="comment" data-id="${escapeHTML(c.id)}" data-alias="${escapeHTML(c.alias)}" data-text="${escapeHTML(c.text)}">⚑ Report</button>
-            </div>
-          `).join('');
-
-          commentsHTML = `
-            <div class="comments-section">
-              ${list}
-              <form class="comment-form" data-id="${escapeHTML(post.id)}">
-                <input type="text" placeholder="Write a supportive reply..." required />
-                <button type="submit" class="primary-btn">Reply</button>
-              </form>
-            </div>
-          `;
+        if (socket && socket.connected) {
+          socket.emit('wall:create_post', {
+            id: clientPostId,
+            alias: myAlias,
+            mood,
+            interest,
+            content,
+            allowComments,
+            createdAt
+          });
         }
 
-        const interestDisplay = interestLabels[post.interest] || post.interest || 'Iced Coffee';
+        contentInput.value = '';
+      });
 
-        card.innerHTML = `
-          <div class="post-header">
-            <span><strong>${escapeHTML(post.alias)}</strong> • ${escapeHTML(post.timestamp || 'Recently')}</span>
-            <div class="badge-group">
-              <span class="badge">#${escapeHTML(post.mood)}</span>
-              <span class="badge interest">${escapeHTML(interestDisplay)}</span>
+      filterMood.addEventListener('change', renderPosts);
+      filterInterest.addEventListener('change', renderPosts);
+
+      function renderPosts() {
+        if (Object.keys(postsMap).length === 0) {
+          starterPosts.forEach(p => {
+            postsMap[p.id] = clonePost(p);
+          });
+        }
+
+        const selectedMood = filterMood.value;
+        const selectedInterest = filterInterest.value;
+
+        const sortedPosts = Object.values(postsMap)
+          .filter(p => {
+            if (!p || !p.content || hiddenItems.has(p.id)) return false;
+            const matchesMood = selectedMood === 'ALL' || p.mood === selectedMood;
+            const matchesInterest =
+              selectedInterest === 'ALL' ||
+              (p.interest && p.interest === selectedInterest);
+            return matchesMood && matchesInterest;
+          })
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+        postsFeed.innerHTML = '';
+
+        if (sortedPosts.length === 0) {
+          postsFeed.innerHTML = `
+            <div class="post-card" style="text-align: center; color: var(--muted);">
+              No posts match this filter yet. Click "Restore Posts" or set filters back to All.
             </div>
+          `;
+          return;
+        }
+
+        sortedPosts.forEach(post => {
+          const card = document.createElement('div');
+          card.className = 'post-card';
+
+          let commentsHTML = '';
+          if (post.allowComments === false) {
+            commentsHTML = `<div class="comments-locked">🔒 Comments are disabled by the author (Vent-only mode)</div>`;
+          } else {
+            const commentArray = (post.comments || [])
+              .filter(c => c && c.text && !hiddenItems.has(c.id))
+              .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+            const list = commentArray.map(c => `
+              <div class="comment-item">
+                <div><strong>${escapeHTML(c.alias)}:</strong> ${escapeHTML(c.text)}</div>
+                <button type="button" class="report-trigger" data-type="comment" data-id="${escapeHTML(c.id)}" data-alias="${escapeHTML(c.alias)}" data-text="${escapeHTML(c.text)}">⚑ Report</button>
+              </div>
+            `).join('');
+
+            commentsHTML = `
+              <div class="comments-section">
+                ${list}
+                <form class="comment-form" data-id="${escapeHTML(post.id)}">
+                  <input type="text" placeholder="Write a supportive reply..." required />
+                  <button type="submit" class="primary-btn">Reply</button>
+                </form>
+              </div>
+            `;
+          }
+
+          const interestDisplay = interestLabels[post.interest] || post.interest || 'Iced Coffee';
+
+          card.innerHTML = `
+            <div class="post-header">
+              <span><strong>${escapeHTML(post.alias)}</strong> • ${escapeHTML(post.timestamp || 'Recently')}</span>
+              <div class="badge-group">
+                <span class="badge">#${escapeHTML(post.mood)}</span>
+                <span class="badge interest">${escapeHTML(interestDisplay)}</span>
+              </div>
+            </div>
+            <div class="post-body">${escapeHTML(post.content)}</div>
+            ${commentsHTML}
+          `;
+
+          postsFeed.appendChild(card);
+        });
+
+        document.querySelectorAll('.report-trigger').forEach(btn => {
+          btn.addEventListener('click', () => {
+            openReportModal(btn.dataset.type, btn.dataset.id, btn.dataset.alias, btn.dataset.text);
+          });
+        });
+
+        document.querySelectorAll('.comment-form').forEach(form => {
+          form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = form.querySelector('input');
+            const text = input.value.trim();
+            const postId = form.dataset.id;
+            if (!text || !postId || !postsMap[postId]) return;
+
+            const clientCommentId = `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            const createdAt = Date.now();
+            const comment = {
+              id: clientCommentId,
+              alias: myAlias,
+              text,
+              createdAt
+            };
+
+            postsMap[postId].comments = mergeComments(postsMap[postId].comments, [comment]);
+            saveStoredPosts();
+            renderPosts();
+
+            if (socket && socket.connected) {
+              socket.emit('wall:add_comment', {
+                id: clientCommentId,
+                postId,
+                alias: myAlias,
+                text,
+                createdAt
+              });
+            }
+          });
+        });
+      }
+
+      // --- 1-MINUTE EMPATHY MATCH LOGIC ---
+      let currentRoomId = null;
+      let countdownInterval = null;
+      let roomUnlocked = false;
+      let activeMatchMood = 'Overthinking';
+      let activePeerAlias = 'Gentle Echo #44';
+      let localBotTurn = 0;
+      const renderedMsgIds = new Set();
+
+      const matchLobby = document.getElementById('match-lobby');
+      const chatRoom = document.getElementById('chat-room');
+      const searchStatus = document.getElementById('search-status');
+      const chatMessages = document.getElementById('chat-messages');
+      const timerDisplay = document.getElementById('timer-display');
+      const decisionBox = document.getElementById('decision-box');
+      const decisionActions = document.getElementById('decision-actions');
+      const decisionPrompt = document.getElementById('decision-prompt');
+      const chatInput = document.getElementById('chat-input');
+      const chatSendBtn = document.getElementById('chat-send-btn');
+
+      const empathyRepliesByMood = {
+        Overthinking: [
+          "I totally get that spiral—when my mind won't slow down, writing out just one tiny next step helps.",
+          "You don't have to figure out every possible outcome tonight. What's the main thing weighing on you right now?",
+          "It makes complete sense that you're mentally drained from replaying everything. Take a slow breath—I'm listening."
+        ],
+        Burnout: [
+          "Running on empty for so long catches up fast. Have you had a real break away from obligations today?",
+          "Rest isn't laziness—your brain is genuinely signaling that it needs recovery time.",
+          "I hear how exhausted you are. Even stepping back for ten quiet minutes counts."
+        ],
+        AcademicPressure: [
+          "Deadlines and expectations can make it feel like one grade defines everything, even when it doesn't.",
+          "Breaking a huge assignment into one 15-minute chunk is honestly the only way I survive weeks like that.",
+          "You're carrying a lot right now—be gentle with yourself while you work through it."
+        ],
+        Heartbreak: [
+          "Heartache sits so heavy in the chest. It's okay if you're not ready to 'look on the bright side' yet.",
+          "Missing someone or grieving what changed takes real time. I'm glad you didn't keep it bottled up alone.",
+          "Take things hour by hour tonight. Your feelings are completely valid."
+        ],
+        Lonely: [
+          "Feeling disconnected even when people are around is a really tough feeling. I'm glad we matched for this minute.",
+          "Sometimes just knowing someone out there is genuinely reading your words makes the room feel a little warmer.",
+          "I'm right here with you—tell me about your day or whatever is on your mind."
+        ],
+        Grateful: [
+          "It's really uplifting to hear something bright today! What little moment sparked that for you?",
+          "Holding onto those small wins makes such a difference during busy weeks.",
+          "Thanks for sharing that positive energy—it genuinely made me smile."
+        ]
+      };
+
+      function getNextLocalPeerReply(mood) {
+        const pool = empathyRepliesByMood[mood] || empathyRepliesByMood.Overthinking;
+        const reply = pool[localBotTurn % pool.length];
+        localBotTurn += 1;
+        return reply;
+      }
+
+      function openMatchRoom({ roomId, partnerAlias, mood, interest, endsAt, localMode }) {
+        clearTimeout(matchFallbackTimer);
+        clearTimeout(botReplyTimer);
+        isSearchingMatch = false;
+        isLocalMatchSession = Boolean(localMode);
+        currentRoomId = roomId;
+        activeMatchMood = mood || 'Overthinking';
+        activePeerAlias = partnerAlias || 'Gentle Echo #44';
+        roomUnlocked = false;
+        localBotTurn = 0;
+        renderedMsgIds.clear();
+
+        searchStatus.classList.add('hidden');
+        matchLobby.classList.add('hidden');
+        chatRoom.classList.remove('hidden');
+        decisionBox.classList.add('hidden');
+        decisionActions.classList.remove('hidden');
+        decisionPrompt.textContent = 'Time is up! Would you like to continue chatting anonymously?';
+
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+
+        document.getElementById('partner-alias').textContent = activePeerAlias;
+        document.getElementById('chat-mood-badge').textContent = `#${activeMatchMood}`;
+        document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
+
+        chatMessages.innerHTML = `
+          <div class="msg system">
+            Connected with ${escapeHTML(activePeerAlias)} on #${escapeHTML(activeMatchMood)} (${escapeHTML(interestLabels[interest] || interest)}).
+            ${localMode ? 'Instant peer room active.' : 'Synchronized 1-minute session started.'}
           </div>
-          <div class="post-body">${escapeHTML(post.content)}</div>
-          ${commentsHTML}
         `;
 
-        postsFeed.appendChild(card);
+        startSyncedCountdown(endsAt || (Date.now() + 60000));
+      }
+
+      function appendChatMessage(msg) {
+        if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
+        renderedMsgIds.add(msg.id);
+
+        // Accurate ownership check across both local fallback sessions and Socket.IO rooms
+        const isMine = isLocalMatchSession
+          ? msg.senderId === 'me'
+          : (msg.senderId === 'me' || (socket && socket.id && msg.senderId === socket.id));
+
+        const div = document.createElement('div');
+        div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
+        div.dataset.msgId = msg.id;
+
+        if (hiddenItems.has(msg.id)) {
+          div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
+        } else if (isMine) {
+          div.textContent = msg.text;
+        } else {
+          div.innerHTML = `
+            <div class="msg-meta">
+              <strong>${escapeHTML(msg.alias)}</strong>
+              <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
+            </div>
+            <div>${escapeHTML(msg.text)}</div>
+          `;
+          div.querySelector('.chat-report-btn').addEventListener('click', () => {
+            openReportModal('chat', msg.id, msg.alias, msg.text);
+          });
+        }
+
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      document.getElementById('start-match-btn').addEventListener('click', () => {
+        if (isSearchingMatch || currentRoomId) return;
+
+        const mood = document.getElementById('match-mood').value;
+        const interest = document.getElementById('match-interest').value;
+
+        isSearchingMatch = true;
+        document.getElementById('searching-mood').textContent = `#${mood}`;
+        document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+        searchStatus.classList.remove('hidden');
+
+        clearTimeout(matchFallbackTimer);
+        clearTimeout(botReplyTimer);
+
+        if (socket && socket.connected) {
+          socket.emit('match:find', {
+            mood,
+            experience: mood,
+            interest,
+            alias: myAlias
+          });
+        }
+
+        matchFallbackTimer = setTimeout(() => {
+          if (!currentRoomId && isSearchingMatch) {
+            const peerAlias = generateAlias();
+            openMatchRoom({
+              roomId: `local-room-${Date.now()}`,
+              partnerAlias: peerAlias,
+              mood,
+              interest,
+              endsAt: Date.now() + 60000,
+              localMode: true
+            });
+
+            const roomSnapshot = currentRoomId;
+            botReplyTimer = setTimeout(() => {
+              if (currentRoomId !== roomSnapshot) return;
+              appendChatMessage({
+                id: `bot-open-${Date.now()}`,
+                roomId: roomSnapshot,
+                senderId: 'peer-bot',
+                alias: peerAlias,
+                text: `Hey there—I also selected #${mood}. You have a safe minute here to share whatever is on your mind.`,
+                createdAt: Date.now()
+              });
+            }, 650);
+          }
+        }, 1400);
       });
 
-      document.querySelectorAll('.report-trigger').forEach(btn => {
-        btn.addEventListener('click', () => {
-          openReportModal(btn.dataset.type, btn.dataset.id, btn.dataset.alias, btn.dataset.text);
-        });
+      document.getElementById('cancel-match-btn').addEventListener('click', () => {
+        clearTimeout(matchFallbackTimer);
+        clearTimeout(botReplyTimer);
+        isSearchingMatch = false;
+        searchStatus.classList.add('hidden');
+        if (socket && socket.connected) {
+          socket.emit('match:cancel');
+        }
       });
 
-      document.querySelectorAll('.comment-form').forEach(form => {
-        form.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const input = form.querySelector('input');
-          const text = input.value.trim();
-          const postId = form.dataset.id;
-          if (!text || !postId || !postsMap[postId]) return;
+      function startSyncedCountdown(endsAt) {
+        clearInterval(countdownInterval);
 
-          const comment = {
-            id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        const tick = () => {
+          if (roomUnlocked || !currentRoomId) return;
+          const remainingMs = Math.max(0, endsAt - Date.now());
+          const totalSecs = Math.ceil(remainingMs / 1000);
+          const mins = String(Math.floor(totalSecs / 60)).padStart(2, '0');
+          const secs = String(totalSecs % 60).padStart(2, '0');
+          timerDisplay.textContent = `${mins}:${secs}`;
+
+          if (remainingMs <= 0) {
+            clearInterval(countdownInterval);
+            timerDisplay.textContent = '00:00';
+            chatInput.disabled = true;
+            chatSendBtn.disabled = true;
+            decisionBox.classList.remove('hidden');
+          }
+        };
+
+        tick();
+        countdownInterval = setInterval(tick, 250);
+      }
+
+      document.getElementById('chat-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!currentRoomId || chatInput.disabled) return;
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        if (isLocalMatchSession) {
+          appendChatMessage({
+            id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            roomId: currentRoomId,
+            senderId: 'me',
             alias: myAlias,
             text,
             createdAt: Date.now()
-          };
-
-          postsMap[postId].comments = postsMap[postId].comments || [];
-          postsMap[postId].comments.push(comment);
-          saveStoredPosts();
-          renderPosts();
-
-          if (socket && socket.connected) {
-            socket.emit('wall:add_comment', {
-              postId,
-              alias: myAlias,
-              text
-            });
-          }
-
-          input.value = '';
-        });
-      });
-    }
-
-    // --- 1-MINUTE EMPATHY MATCH LOGIC ---
-    let currentRoomId = null;
-    let countdownInterval = null;
-    let roomUnlocked = false;
-    let activeMatchMood = 'Overthinking';
-    const renderedMsgIds = new Set();
-
-    const matchLobby = document.getElementById('match-lobby');
-    const chatRoom = document.getElementById('chat-room');
-    const searchStatus = document.getElementById('search-status');
-    const chatMessages = document.getElementById('chat-messages');
-    const timerDisplay = document.getElementById('timer-display');
-    const decisionBox = document.getElementById('decision-box');
-    const chatInput = document.getElementById('chat-input');
-    const chatSendBtn = document.getElementById('chat-send-btn');
-
-    function openMatchRoom({ roomId, partnerAlias, mood, interest, endsAt, localMode }) {
-      clearTimeout(matchFallbackTimer);
-      clearTimeout(botReplyTimer);
-      isLocalMatchSession = Boolean(localMode);
-      currentRoomId = roomId;
-      activeMatchMood = mood || 'Overthinking';
-      roomUnlocked = false;
-      renderedMsgIds.clear();
-
-      searchStatus.classList.add('hidden');
-      matchLobby.classList.add('hidden');
-      chatRoom.classList.remove('hidden');
-      decisionBox.classList.add('hidden');
-      document.querySelector('.decision-actions').classList.remove('hidden');
-      document.getElementById('decision-prompt').textContent =
-        'Time is up! Would you like to continue chatting anonymously?';
-
-      chatInput.disabled = false;
-      chatSendBtn.disabled = false;
-
-      document.getElementById('partner-alias').textContent = partnerAlias || 'Echo Cloud #31';
-      document.getElementById('chat-mood-badge').textContent = `#${activeMatchMood}`;
-      document.getElementById('chat-interest-badge').textContent = interestLabels[interest] || interest;
-
-      chatMessages.innerHTML = `
-        <div class="msg system">
-          Connected with ${escapeHTML(partnerAlias || 'Echo Cloud #31')} on #${escapeHTML(activeMatchMood)} (${escapeHTML(interestLabels[interest] || interest)}).
-          ${localMode ? 'Instant peer room active on GitHub.' : 'Synchronized 1-minute session started.'}
-        </div>
-      `;
-
-      startSyncedCountdown(endsAt || (Date.now() + 60000));
-    }
-
-    function appendChatMessage(msg) {
-      if (!msg || !msg.id || msg.roomId !== currentRoomId || renderedMsgIds.has(msg.id)) return;
-      renderedMsgIds.add(msg.id);
-
-      const isMine = msg.senderId === (socket ? socket.id : 'me');
-      const div = document.createElement('div');
-      div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
-      div.dataset.msgId = msg.id;
-
-      if (hiddenItems.has(msg.id)) {
-        div.innerHTML = `<em style="color: var(--muted); font-size: 0.8rem;">[Message reported and hidden]</em>`;
-      } else if (isMine) {
-        div.textContent = msg.text;
-      } else {
-        div.innerHTML = `
-          <div class="msg-meta">
-            <strong>${escapeHTML(msg.alias)}</strong>
-            <button type="button" class="report-trigger chat-report-btn">⚑ Report</button>
-          </div>
-          <div>${escapeHTML(msg.text)}</div>
-        `;
-        div.querySelector('.chat-report-btn').addEventListener('click', () => {
-          openReportModal('chat', msg.id, msg.alias, msg.text);
-        });
-      }
-
-      chatMessages.appendChild(div);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    document.getElementById('start-match-btn').addEventListener('click', () => {
-      const mood = document.getElementById('match-mood').value;
-      const interest = document.getElementById('match-interest').value;
-
-      document.getElementById('searching-mood').textContent = `#${mood}`;
-      document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-      searchStatus.classList.remove('hidden');
-
-      clearTimeout(matchFallbackTimer);
-      clearTimeout(botReplyTimer);
-
-      if (socket && socket.connected) {
-        socket.emit('match:find', {
-          mood,
-          experience: mood,
-          interest,
-          alias: myAlias
-        });
-      }
-
-      // Open a working 1-minute empathy chat room automatically if no live remote partner pairs within 1.5s
-      matchFallbackTimer = setTimeout(() => {
-        if (!currentRoomId && !searchStatus.classList.contains('hidden')) {
-          const peerAlias = 'Gentle Echo #44';
-          openMatchRoom({
-            roomId: `local-room-${Date.now()}`,
-            partnerAlias: peerAlias,
-            mood,
-            interest,
-            endsAt: Date.now() + 60000,
-            localMode: true
           });
+
+          clearTimeout(botReplyTimer);
+          const activeRoomSnapshot = currentRoomId;
+          const peerSnapshot = activePeerAlias;
+          const moodSnapshot = activeMatchMood;
 
           botReplyTimer = setTimeout(() => {
-            if (!currentRoomId) return;
+            if (currentRoomId !== activeRoomSnapshot) return;
             appendChatMessage({
-              id: `bot-open-${Date.now()}`,
-              roomId: currentRoomId,
+              id: `bot-reply-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+              roomId: activeRoomSnapshot,
               senderId: 'peer-bot',
-              alias: peerAlias,
-              text: `Hey there—I also picked #${mood}. You have a full minute here to vent or talk it through.`,
+              alias: peerSnapshot,
+              text: getNextLocalPeerReply(moodSnapshot),
               createdAt: Date.now()
             });
-          }, 700);
+          }, 950);
+        } else if (socket && socket.connected) {
+          socket.emit('match:message', {
+            roomId: currentRoomId,
+            alias: myAlias,
+            text
+          });
         }
-      }, 1500);
-    });
 
-    document.getElementById('cancel-match-btn').addEventListener('click', () => {
-      clearTimeout(matchFallbackTimer);
-      clearTimeout(botReplyTimer);
-      searchStatus.classList.add('hidden');
-      if (socket && socket.connected) {
-        socket.emit('match:cancel');
-      }
-    });
+        chatInput.value = '';
+      });
 
-    function startSyncedCountdown(endsAt) {
-      clearInterval(countdownInterval);
-
-      const tick = () => {
-        if (roomUnlocked || !currentRoomId) return;
-        const remainingMs = Math.max(0, endsAt - Date.now());
-        const totalSecs = Math.ceil(remainingMs / 1000);
-        const mins = String(Math.floor(totalSecs / 60)).padStart(2, '0');
-        const secs = String(totalSecs % 60).padStart(2, '0');
-        timerDisplay.textContent = `${mins}:${secs}`;
-
-        if (remainingMs <= 0) {
-          clearInterval(countdownInterval);
-          timerDisplay.textContent = '00:00';
-          chatInput.disabled = true;
-          chatSendBtn.disabled = true;
-          decisionBox.classList.remove('hidden');
-        }
-      };
-
-      tick();
-      countdownInterval = setInterval(tick, 250);
-    }
-
-    document.getElementById('chat-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      if (!currentRoomId || chatInput.disabled) return;
-      const text = chatInput.value.trim();
-      if (!text) return;
-
-      if (isLocalMatchSession) {
-        appendChatMessage({
-          id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          roomId: currentRoomId,
-          senderId: 'me',
-          alias: myAlias,
-          text,
-          createdAt: Date.now()
-        });
-
-        clearTimeout(botReplyTimer);
-        const activeRoomSnapshot = currentRoomId;
-        botReplyTimer = setTimeout(() => {
-          if (currentRoomId !== activeRoomSnapshot) return;
-          appendChatMessage({
-            id: `bot-reply-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-            roomId: activeRoomSnapshot,
-            senderId: 'peer-bot',
-            alias: 'Gentle Echo #44',
-            text: `I hear you on that. Dealing with #${activeMatchMood} can be heavy, and you're making sense.`,
-            createdAt: Date.now()
-          });
-        }, 1100);
-      } else if (socket && socket.connected) {
-        socket.emit('match:message', {
-          roomId: currentRoomId,
-          alias: myAlias,
-          text
-        });
-      }
-
-      chatInput.value = '';
-    });
-
-    document.getElementById('consent-yes').addEventListener('click', () => {
-      if (!currentRoomId) return;
-      if (isLocalMatchSession || !socket || !socket.connected) {
-        roomUnlocked = true;
-        clearInterval(countdownInterval);
-        decisionBox.classList.add('hidden');
-        document.querySelector('.decision-actions').classList.remove('hidden');
-        chatInput.disabled = false;
-        chatSendBtn.disabled = false;
-        timerDisplay.textContent = 'Unlocked ∞';
-        const sys = document.createElement('div');
-        sys.className = 'msg system';
-        sys.textContent = 'Chat unlocked! You can keep messaging freely.';
-        chatMessages.appendChild(sys);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        return;
-      }
-      socket.emit('match:consent', { roomId: currentRoomId, agree: true });
-    });
-
-    document.getElementById('consent-no').addEventListener('click', () => {
-      if (!currentRoomId) return;
-      if (isLocalMatchSession || !socket || !socket.connected) {
-        resetChatUI();
-        return;
-      }
-      socket.emit('match:consent', { roomId: currentRoomId, agree: false });
-    });
-
-    document.getElementById('leave-chat-btn').addEventListener('click', () => {
-      if (!isLocalMatchSession && socket && socket.connected) {
-        socket.emit('match:leave');
-      }
-      resetChatUI();
-    });
-
-    function resetChatUI() {
-      clearTimeout(matchFallbackTimer);
-      clearTimeout(botReplyTimer);
-      clearInterval(countdownInterval);
-      currentRoomId = null;
-      isLocalMatchSession = false;
-      chatRoom.classList.add('hidden');
-      matchLobby.classList.remove('hidden');
-      chatInput.disabled = false;
-      chatSendBtn.disabled = false;
-      document.querySelector('.decision-actions').classList.remove('hidden');
-      document.getElementById('decision-prompt').textContent = 'Time is up! Would you like to continue chatting anonymously?';
-    }
-
-    function escapeHTML(str) {
-      if (!str) return '';
-      return String(str).replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-      }[tag]));
-    }
-
-    // --- OPTIONAL LIVE SERVER SYNC (NON-BLOCKING) ---
-    async function tryLiveSync() {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        const res = await fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
-          method: 'GET',
-          cache: 'no-store',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        if (!res.ok) return;
-
-        socket = io(BACKEND_BASE_URL, {
-          query: { alias: myAlias },
-          transports: ['polling', 'websocket'],
-          reconnection: true,
-          timeout: 8000
-        });
-
-        socket.on('connect', () => {
-          setPresenceUI({ online: true, statusText: 'Live Sync' });
-          socket.emit('identity:update_alias', { alias: myAlias });
-        });
-
-        socket.on('disconnect', () => {
-          setPresenceUI({ online: false, statusText: 'GitHub Ready' });
-        });
-
-        const onPresence = (payload) => {
-          if (!payload || typeof payload.count !== 'number') return;
-          setPresenceUI({
-            online: socket.connected,
-            count: payload.count,
-            statusText: socket.connected ? 'Live Sync' : 'GitHub Ready'
-          });
-        };
-        socket.on('presenceUpdate', onPresence);
-        socket.on('presence:update', onPresence);
-
-        socket.on('wall:init', ({ posts }) => {
-          if (Array.isArray(posts) && posts.length > 0) {
-            hydratePosts(posts);
-          }
-        });
-
-        socket.on('wall:new_post', ({ post }) => {
-          if (post && post.id) {
-            hydratePosts([post]);
-          }
-        });
-
-        socket.on('wall:new_comment', ({ postId, comment }) => {
-          if (!postId || !comment || !postsMap[postId]) return;
-          postsMap[postId].comments = postsMap[postId].comments || [];
-          if (!postsMap[postId].comments.some(c => c.id === comment.id)) {
-            postsMap[postId].comments.push(comment);
-            saveStoredPosts();
-            renderPosts();
-          }
-        });
-
-        socket.on('match:paired', (data) => {
-          openMatchRoom({
-            roomId: data.roomId,
-            partnerAlias: data.partnerAlias,
-            mood: data.experience || data.mood,
-            interest: data.interest,
-            endsAt: data.endsAt,
-            localMode: false
-          });
-        });
-
-        socket.on('match:message', appendChatMessage);
-
-        socket.on('match:consent_waiting', () => {
-          document.getElementById('decision-prompt').textContent = 'Waiting for your partner to decide...';
-          document.querySelector('.decision-actions').classList.add('hidden');
-        });
-
-        socket.on('match:unlocked', () => {
+      document.getElementById('consent-yes').addEventListener('click', () => {
+        if (!currentRoomId) return;
+        if (isLocalMatchSession || !socket || !socket.connected) {
           roomUnlocked = true;
           clearInterval(countdownInterval);
           decisionBox.classList.add('hidden');
-          document.querySelector('.decision-actions').classList.remove('hidden');
+          decisionActions.classList.remove('hidden');
           chatInput.disabled = false;
           chatSendBtn.disabled = false;
           timerDisplay.textContent = 'Unlocked ∞';
           const sys = document.createElement('div');
           sys.className = 'msg system';
-          sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
+          sys.textContent = 'Chat unlocked! You can keep messaging freely.';
           chatMessages.appendChild(sys);
           chatMessages.scrollTop = chatMessages.scrollHeight;
-        });
+          return;
+        }
+        decisionPrompt.textContent = 'Waiting for your partner to decide...';
+        decisionActions.classList.add('hidden');
+        socket.emit('match:consent', { roomId: currentRoomId, agree: true });
+      });
 
-        socket.on('match:ended', ({ reason }) => {
-          alert(reason || 'The conversation has ended.');
+      document.getElementById('consent-no').addEventListener('click', () => {
+        if (!currentRoomId) return;
+        if (isLocalMatchSession || !socket || !socket.connected) {
           resetChatUI();
-        });
-
-        socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
-          const expLabel = experience || mood;
-          resetChatUI();
-          document.getElementById('searching-mood').textContent = `#${expLabel}`;
-          document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
-          searchStatus.classList.remove('hidden');
-          alert(reason || 'Your partner left. Returned to matchmaking pool.');
-        });
-      } catch (_) {
-        setPresenceUI({ online: false, statusText: 'GitHub Ready' });
-      }
-    }
-
-    tryLiveSync();
-
-    // --- RIGHT-SIDE CORNER AMBIENT PLAYLIST (WEB AUDIO API) ---
-    const tracks = [
-      { name: 'Rainy Café Ambience', freqs: [174.61, 220.00, 261.63, 329.63], type: 'sine', rain: true },
-      { name: 'Midnight Lo-Fi Chords', freqs: [146.83, 174.61, 220.00, 261.63], type: 'triangle', rain: false },
-      { name: 'Warm Hearth Drone', freqs: [130.81, 196.00, 246.94, 293.66], type: 'sine', rain: true }
-    ];
-
-    let currentTrackIdx = 0;
-    let isPlayingMusic = false;
-    let audioCtx = null;
-    let masterGain = null;
-    let activeNodes = [];
-
-    const musicWidget = document.getElementById('music-widget');
-    const playPauseBtn = document.getElementById('play-pause-btn');
-    const trackNow = document.getElementById('track-now');
-    const volumeSlider = document.getElementById('volume-slider');
-
-    document.getElementById('music-toggle-header').addEventListener('click', () => {
-      musicWidget.classList.toggle('collapsed');
-      document.getElementById('music-collapse-icon').textContent =
-        musicWidget.classList.contains('collapsed') ? '▴' : '▾';
-    });
-
-    function stopAudioNodes() {
-      activeNodes.forEach(node => {
-        try { node.stop(); } catch (e) {}
-        try { node.disconnect(); } catch (e) {}
-      });
-      activeNodes = [];
-    }
-
-    function startTrack(index) {
-      currentTrackIdx = (index + tracks.length) % tracks.length;
-      const track = tracks[currentTrackIdx];
-
-      document.querySelectorAll('.playlist-item').forEach((el, idx) => {
-        el.classList.toggle('active', idx === currentTrackIdx);
+          showToast('Empathy chat session ended.');
+          return;
+        }
+        socket.emit('match:consent', { roomId: currentRoomId, agree: false });
+        resetChatUI();
       });
 
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        masterGain = audioCtx.createGain();
-        masterGain.gain.value = parseFloat(volumeSlider.value) * 0.15;
-        masterGain.connect(audioCtx.destination);
-      }
-
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-
-      stopAudioNodes();
-
-      track.freqs.forEach((freq, i) => {
-        const osc = audioCtx.createOscillator();
-        const filter = audioCtx.createBiquadFilter();
-        const oscGain = audioCtx.createGain();
-
-        osc.type = track.type;
-        osc.frequency.value = freq;
-        osc.detune.value = (i % 2 === 0 ? 4 : -4);
-
-        filter.type = 'lowpass';
-        filter.frequency.value = 480;
-
-        oscGain.gain.value = 0.22;
-
-        osc.connect(filter);
-        filter.connect(oscGain);
-        oscGain.connect(masterGain);
-        osc.start();
-        activeNodes.push(osc);
+      document.getElementById('leave-chat-btn').addEventListener('click', () => {
+        if (!isLocalMatchSession && socket && socket.connected) {
+          socket.emit('match:leave');
+        }
+        resetChatUI();
       });
 
-      if (track.rain) {
-        const bufferSize = 2 * audioCtx.sampleRate;
-        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const output = noiseBuffer.getChannelData(0);
-        let lastOut = 0.0;
-        for (let i = 0; i < bufferSize; i++) {
-          const white = Math.random() * 2 - 1;
-          output[i] = (lastOut + (0.02 * white)) / 1.02;
-          lastOut = output[i];
-          output[i] *= 1.8;
+      function resetChatUI() {
+        clearTimeout(matchFallbackTimer);
+        clearTimeout(botReplyTimer);
+        clearInterval(countdownInterval);
+        currentRoomId = null;
+        roomUnlocked = false;
+        isLocalMatchSession = false;
+        isSearchingMatch = false;
+        renderedMsgIds.clear();
+
+        searchStatus.classList.add('hidden');
+        chatRoom.classList.add('hidden');
+        decisionBox.classList.add('hidden');
+        decisionActions.classList.remove('hidden');
+        decisionPrompt.textContent = 'Time is up! Would you like to continue chatting anonymously?';
+        matchLobby.classList.remove('hidden');
+
+        chatMessages.innerHTML = '';
+        chatInput.value = '';
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+        timerDisplay.textContent = '01:00';
+      }
+
+      function escapeHTML(str) {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>'"]/g, tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag]));
+      }
+
+      // --- OPTIONAL LIVE SERVER SYNC (NON-BLOCKING & COLLISION-SAFE) ---
+      async function tryLiveSync() {
+        if (typeof window.io !== 'function') {
+          setPresenceUI({ online: false, statusText: 'Standalone Mode' });
+          return;
         }
 
-        const whiteNoise = audioCtx.createBufferSource();
-        whiteNoise.buffer = noiseBuffer;
-        whiteNoise.loop = true;
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2500);
+          const res = await fetch(`${BACKEND_BASE_URL}/api/health?t=${Date.now()}`, {
+            method: 'GET',
+            cache: 'no-store',
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (!res.ok) return;
 
-        const rainFilter = audioCtx.createBiquadFilter();
-        rainFilter.type = 'bandpass';
-        rainFilter.frequency.value = 700;
+          socket = window.io(BACKEND_BASE_URL, {
+            query: { alias: myAlias },
+            transports: ['polling', 'websocket'],
+            reconnection: true,
+            timeout: 6000
+          });
 
-        const rainGain = audioCtx.createGain();
-        rainGain.gain.value = 0.18;
+          socket.on('connect', () => {
+            setPresenceUI({ online: true, statusText: 'Live Sync' });
+            socket.emit('identity:update_alias', { alias: myAlias });
+          });
 
-        whiteNoise.connect(rainFilter);
-        rainFilter.connect(rainGain);
-        rainGain.connect(masterGain);
-        whiteNoise.start();
-        activeNodes.push(whiteNoise);
+          socket.on('disconnect', () => {
+            setPresenceUI({ online: false, statusText: 'Standalone Mode' });
+          });
+
+          const onPresence = (payload) => {
+            if (!payload || typeof payload.count !== 'number') return;
+            setPresenceUI({
+              online: socket.connected,
+              count: payload.count,
+              statusText: socket.connected ? 'Live Sync' : 'Standalone Mode'
+            });
+          };
+          socket.on('presenceUpdate', onPresence);
+          socket.on('presence:update', onPresence);
+
+          socket.on('wall:init', ({ posts }) => {
+            if (Array.isArray(posts) && posts.length > 0) {
+              hydratePosts(posts);
+            }
+          });
+
+          socket.on('wall:new_post', ({ post }) => {
+            if (post && post.id) {
+              hydratePosts([post]);
+            }
+          });
+
+          socket.on('wall:new_comment', ({ postId, comment }) => {
+            if (!postId || !comment || !postsMap[postId]) return;
+            postsMap[postId].comments = mergeComments(postsMap[postId].comments, [comment]);
+            saveStoredPosts();
+            renderPosts();
+          });
+
+          socket.on('match:paired', (data) => {
+            // Prevent server match event from overriding an already-active local or remote chat
+            if (currentRoomId || isLocalMatchSession) return;
+            clearTimeout(matchFallbackTimer);
+            openMatchRoom({
+              roomId: data.roomId,
+              partnerAlias: data.partnerAlias,
+              mood: data.experience || data.mood,
+              interest: data.interest,
+              endsAt: data.endsAt,
+              localMode: false
+            });
+          });
+
+          socket.on('match:message', (msg) => {
+            if (isLocalMatchSession) return;
+            appendChatMessage(msg);
+          });
+
+          socket.on('match:consent_waiting', () => {
+            if (isLocalMatchSession) return;
+            decisionPrompt.textContent = 'Waiting for your partner to decide...';
+            decisionActions.classList.add('hidden');
+          });
+
+          socket.on('match:unlocked', () => {
+            if (isLocalMatchSession) return;
+            roomUnlocked = true;
+            clearInterval(countdownInterval);
+            decisionBox.classList.add('hidden');
+            decisionActions.classList.remove('hidden');
+            chatInput.disabled = false;
+            chatSendBtn.disabled = false;
+            timerDisplay.textContent = 'Unlocked ∞';
+            const sys = document.createElement('div');
+            sys.className = 'msg system';
+            sys.textContent = 'Both of you agreed to continue! Anonymous chat is now unlocked.';
+            chatMessages.appendChild(sys);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          });
+
+          socket.on('match:ended', ({ reason }) => {
+            if (isLocalMatchSession) return;
+            resetChatUI();
+            showToast(reason || 'The conversation has ended.');
+          });
+
+          socket.on('match:partner_left_requeued', ({ reason, mood, experience, interest }) => {
+            if (isLocalMatchSession) return;
+            const expLabel = experience || mood;
+            resetChatUI();
+            isSearchingMatch = true;
+            document.getElementById('searching-mood').textContent = `#${expLabel}`;
+            document.getElementById('searching-interest').textContent = interestLabels[interest] || interest;
+            searchStatus.classList.remove('hidden');
+            showToast(reason || 'Your partner left. Returned to matchmaking pool.');
+          });
+        } catch (_) {
+          setPresenceUI({ online: false, statusText: 'Standalone Mode' });
+        }
       }
 
-      isPlayingMusic = true;
-      playPauseBtn.textContent = '⏸ Pause';
-      playPauseBtn.classList.add('playing');
-      trackNow.textContent = `Playing — ${track.name}`;
-    }
+      tryLiveSync();
 
-    function pauseTrack() {
-      stopAudioNodes();
-      isPlayingMusic = false;
-      playPauseBtn.textContent = '▶ Play';
-      playPauseBtn.classList.remove('playing');
-      trackNow.textContent = `Paused — ${tracks[currentTrackIdx].name}`;
-    }
+      // --- RIGHT-SIDE CORNER AMBIENT PLAYLIST (WEB AUDIO API) ---
+      const tracks = [
+        { name: 'Rainy Café Ambience', freqs: [174.61, 220.00, 261.63, 329.63], type: 'sine', rain: true },
+        { name: 'Midnight Lo-Fi Chords', freqs: [146.83, 174.61, 220.00, 261.63], type: 'triangle', rain: false },
+        { name: 'Warm Hearth Drone', freqs: [130.81, 196.00, 246.94, 293.66], type: 'sine', rain: true }
+      ];
 
-    playPauseBtn.addEventListener('click', () => {
-      if (isPlayingMusic) pauseTrack();
-      else startTrack(currentTrackIdx);
-    });
+      let currentTrackIdx = 0;
+      let isPlayingMusic = false;
+      let audioCtx = null;
+      let masterGain = null;
+      let activeNodes = [];
+      let trackStartSeq = 0;
 
-    document.getElementById('prev-track-btn').addEventListener('click', () => startTrack(currentTrackIdx - 1));
-    document.getElementById('next-track-btn').addEventListener('click', () => startTrack(currentTrackIdx + 1));
+      const musicWidget = document.getElementById('music-widget');
+      const playPauseBtn = document.getElementById('play-pause-btn');
+      const trackNow = document.getElementById('track-now');
+      const volumeSlider = document.getElementById('volume-slider');
 
-    document.querySelectorAll('.playlist-item').forEach(item => {
-      item.addEventListener('click', () => {
-        startTrack(parseInt(item.dataset.index, 10));
+      document.getElementById('music-toggle-header').addEventListener('click', () => {
+        musicWidget.classList.toggle('collapsed');
+        document.getElementById('music-collapse-icon').textContent =
+          musicWidget.classList.contains('collapsed') ? '▴' : '▾';
       });
-    });
 
-    volumeSlider.addEventListener('input', (e) => {
-      if (masterGain) {
-        masterGain.gain.value = parseFloat(e.target.value) * 0.15;
+      function stopAudioNodes() {
+        activeNodes.forEach(node => {
+          try { node.stop(); } catch (_) {}
+          try { node.disconnect(); } catch (_) {}
+        });
+        activeNodes = [];
       }
+
+      function syncVolume() {
+        if (masterGain && audioCtx) {
+          const vol = Math.max(0, Math.min(1, parseFloat(volumeSlider.value) || 0));
+          masterGain.gain.setTargetAtTime(vol * 0.15, audioCtx.currentTime, 0.02);
+        }
+      }
+
+      async function startTrack(index) {
+        const seq = ++trackStartSeq;
+        currentTrackIdx = (index + tracks.length) % tracks.length;
+        const track = tracks[currentTrackIdx];
+
+        document.querySelectorAll('.playlist-item').forEach((el, idx) => {
+          el.classList.toggle('active', idx === currentTrackIdx);
+        });
+
+        try {
+          if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) {
+              showToast('Web Audio API is not supported in this browser.');
+              return;
+            }
+            audioCtx = new AudioContextClass();
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = (parseFloat(volumeSlider.value) || 0.35) * 0.15;
+            masterGain.connect(audioCtx.destination);
+          }
+
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+          }
+
+          // Abort if user clicked Pause or switched tracks again while resuming
+          if (seq !== trackStartSeq) return;
+
+          stopAudioNodes();
+          syncVolume();
+
+          track.freqs.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const filter = audioCtx.createBiquadFilter();
+            const oscGain = audioCtx.createGain();
+
+            osc.type = track.type;
+            osc.frequency.value = freq;
+            osc.detune.value = (i % 2 === 0 ? 4 : -4);
+
+            filter.type = 'lowpass';
+            filter.frequency.value = 480;
+
+            oscGain.gain.value = 0.22;
+
+            osc.connect(filter);
+            filter.connect(oscGain);
+            oscGain.connect(masterGain);
+            osc.start();
+            activeNodes.push(osc, filter, oscGain);
+          });
+
+          if (track.rain) {
+            const bufferSize = 2 * audioCtx.sampleRate;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            let lastOut = 0.0;
+            for (let i = 0; i < bufferSize; i++) {
+              const white = Math.random() * 2 - 1;
+              output[i] = (lastOut + (0.02 * white)) / 1.02;
+              lastOut = output[i];
+              output[i] *= 1.8;
+            }
+
+            const whiteNoise = audioCtx.createBufferSource();
+            whiteNoise.buffer = noiseBuffer;
+            whiteNoise.loop = true;
+
+            const rainFilter = audioCtx.createBiquadFilter();
+            rainFilter.type = 'bandpass';
+            rainFilter.frequency.value = 700;
+
+            const rainGain = audioCtx.createGain();
+            rainGain.gain.value = 0.18;
+
+            whiteNoise.connect(rainFilter);
+            rainFilter.connect(rainGain);
+            rainGain.connect(masterGain);
+            whiteNoise.start();
+            activeNodes.push(whiteNoise, rainFilter, rainGain);
+          }
+
+          isPlayingMusic = true;
+          playPauseBtn.textContent = '⏸ Pause';
+          playPauseBtn.classList.add('playing');
+          trackNow.textContent = `Playing — ${track.name}`;
+        } catch (_) {
+          isPlayingMusic = false;
+          playPauseBtn.textContent = '▶ Play';
+          playPauseBtn.classList.remove('playing');
+          showToast('Click Play again to enable audio playback.');
+        }
+      }
+
+      function pauseTrack() {
+        trackStartSeq += 1;
+        stopAudioNodes();
+        isPlayingMusic = false;
+        playPauseBtn.textContent = '▶ Play';
+        playPauseBtn.classList.remove('playing');
+        trackNow.textContent = `Paused — ${tracks[currentTrackIdx].name}`;
+      }
+
+      playPauseBtn.addEventListener('click', () => {
+        if (isPlayingMusic) pauseTrack();
+        else startTrack(currentTrackIdx);
+      });
+
+      document.getElementById('prev-track-btn').addEventListener('click', () => startTrack(currentTrackIdx - 1));
+      document.getElementById('next-track-btn').addEventListener('click', () => startTrack(currentTrackIdx + 1));
+
+      document.querySelectorAll('.playlist-item').forEach(item => {
+        item.addEventListener('click', () => {
+          startTrack(parseInt(item.dataset.index, 10));
+        });
+      });
+
+      volumeSlider.addEventListener('input', syncVolume);
     });
   </script>
 </body>
